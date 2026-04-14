@@ -1,0 +1,72 @@
+#--- JAVA / BACKEND ---
+target/
+out/
+*.class
+*.log
+*.log.*
+*.jar
+*.war
+*.ear
+
+#--- IDEs & CONFIGS ---
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.springBeans
+.sts4-cache
+
+#--- MAVEN ---
+.mvn/wrapper/maven-wrapper.jar
+
+#--- FRONTEND FUTURO (Node.js/React) ---
+# Essencial para não travar Git
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+# Pastas de build do frontend
+dist/
+build/
+.next/
+
+#--- PYTHON / IA SERVICES ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+#--- SISTEMA OPERACIONAL ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+
+#--- SEGURANÇA ---
+# Variáveis de ambiente (Segredos)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+
+#--- PROJETO ESPECÍFICO (Mídias da IA) ---
+# Ignorar arquivos temporários gerados pelo serviço Python
+media_temp/
+*.apkg
+*.mp3
+*.wav
+*.jpg
+*.jpeg
+*.png
