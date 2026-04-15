@@ -63,9 +63,9 @@ que o Java pode chamar.
 - **OpenAI SDK:** para integração com o GPT-4o-mini.
 - **Edge-TTS:** para gerar áudios com vozes neurais realistas sem custo.
 
-# Diagramação
+## Diagramação
 
-## Fase 1: o trabalho do Maven (*build* e compilação)
+### Fase 1: o trabalho do Maven (*build* e compilação)
 Antes de executar, o código legível para humanos precisa ser traduzido e empacotado. **O Maven
 realiza as seguintes tarefas:**
 
@@ -76,6 +76,7 @@ traduz para *bytecode*, gerando arquivos `.class`. O *bytecode* é uma linguagem
 que qualquer computador entende, desde que tenha o Java instalado.
 3. Junta todos os arquivos .class, mais os arquivos do Spring Boot e de todas as dependências, e 
 empacota tudo em um único arquivo `.jar` (Java ARchive).
+
 ```mermaid
 graph TD
 
@@ -86,21 +87,49 @@ graph TD
         end
         B --> C[Empacotamento da aplicação em arquivo .jar]
     end
-    
-    style Maven fill:#f9f9f9,stroke:#00509E,stroke-width:2px,stroke-dasharray: 5 5
-    style Javac fill:#e6f7ff,stroke:#008000,stroke-width:2px
+
+    style Maven fill:transparent,stroke:#00509E,stroke-width:2px,stroke-dasharray: 5 5
+    style Javac fill:transparent,stroke:#008000,stroke-width:2px
 ```
 
-## Fase 2: despertar da JVM (execução)
+### Fase 2: despertar da JVM (execução)
 Quando a aplicação principal é executada, o sistema operacional chama a JVM (Java Virtual Machine).
 
 1. **Class loader:** a JVM pega o arquivo `.jar` e começa a carregar as classes para a memória RAM.
 2. **Execução Just-In-Time (JIT):** a JVM lê o bytecode (arquivos `.class`) e os traduz em tempo 
 real para a linguagem de máquina específica do processador.
-3. **Ponto de entrada:** a JVM procura o método public static void main(String[] args) dentro 
-da classe `BackendApplication` e dá o "start".
+3. **Ponto de entrada:** a JVM procura o método `public static void main(String[] args)` 
+dentro da classe `BackendApplication` e dá o "start".
 
-## Fase 3: atuação do Spring Boot e as Ferramentas
+```mermaid
+graph TD
+    subgraph SpringBoot [Agente Orquestrador: Spring Boot]
+        A[Injeção de dependências e leitura do application.properties] --> B
+        
+        subgraph Flyway [Flyway]
+            B[Comparação de Checksums e aplicação de scripts SQL pendentes]
+        end
+        
+        B --> C
+        
+        subgraph Hibernate [Hibernate / JPA]
+            C[Conexão ao banco e validação das anotações @Entity]
+        end
+        
+        C --> D
+        
+        subgraph Tomcat [Servidor Tomcat]
+            D[Aplicação liberada. Servidor Tomcat abre na porta 8080]
+        end
+    end
+
+    style SpringBoot fill:transparent,stroke:#008080,stroke-width:2px,stroke-dasharray: 5 5
+    style Flyway fill:transparent,stroke:#D35400,stroke-width:2px
+    style Hibernate fill:transparent,stroke:#4B0082,stroke-width:2px
+    style Tomcat fill:transparent,stroke:#B22222,stroke-width:2px
+```
+
+### Fase 3: atuação do Spring Boot e as Ferramentas
 Assim que o método main chama o `SpringApplication.run()`, as ferramentas trabalham na
 seguinte sequência de orquestração:
 
