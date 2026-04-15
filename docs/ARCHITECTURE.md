@@ -102,31 +102,15 @@ real para a linguagem de máquina específica do processador.
 dentro da classe `BackendApplication` e dá o "start".
 
 ```mermaid
-graph TD
-    subgraph SpringBoot [Agente orquestrador: Spring Boot]
-        A[Injeção de dependências e leitura do application.properties] --> B
-        
-        subgraph Flyway [Flyway]
-            B[Comparação de Checksums e aplicação de scripts SQL pendentes]
-        end
-        
-        B --> C
-        
-        subgraph Hibernate [Hibernate / JPA]
-            C[Conexão ao banco e validação das anotações @Entity]
-        end
-        
-        C --> D
-        
-        subgraph Tomcat [Servidor Tomcat]
-            D[Aplicação liberada. Servidor Tomcat abre na porta 8080]
-        end
+graph LR
+    OS[Sistema Operacional] --> JVM[Início da JVM]
+    subgraph JVM_Process [Processo interno da JVM]
+        CL[Class loader: carrega .class para a RAM] --> JIT[JIT Compiler: traduz para linguagem de máquina]
+        JIT --> MAIN[Busca pelo método main]
     end
+    MAIN --> START[Execução de BackendApplication.java]
 
-    style SpringBoot fill:transparent,stroke:#008080,stroke-width:2px,stroke-dasharray: 5 5
-    style Flyway fill:transparent,stroke:#D35400,stroke-width:2px
-    style Hibernate fill:transparent,stroke:#4B0082,stroke-width:2px
-    style Tomcat fill:transparent,stroke:#B22222,stroke-width:2px
+    style JVM_Process fill:transparent,stroke:#666,stroke-dasharray: 5 5
 ```
 
 ### Fase 3: atuação do Spring Boot e ferramentas
@@ -160,3 +144,26 @@ geralmente na porta 8080.
 
 Ao final, o terminal deve exibir a mensagem `Started BackendApplication in X.XXX seconds`. 
 A aplicação estará escutando a porta 8080 e esperando o envio de requisições HTTP.
+
+```mermaid
+graph TD
+    START((SpringApplication.run)) --> PROPS[1. Leitura de application.properties]
+    PROPS --> SCAN[2. Component scan: localiza @Service, @Controller, @Entity]
+
+    subgraph Data_Layer [Camada de dados]
+        SCAN --> DB_CONN[3. Driver Postgres: abre conexão com o banco]
+        DB_CONN --> FLYWAY[4. Flyway: executa scripts SQL de migração]
+        FLYWAY --> HIBERNATE[5. Hibernate: valida Entities vs Tabelas]
+    end
+    
+    subgraph Security_Docs [Segurança e documentação]
+        HIBERNATE --> SEC[6. Spring Security: ativa filtros de proteção]
+        SEC --> SWAGGER[7. OpenAPI/Swagger: mapeia rotas para o doc]
+    end
+
+    SWAGGER --> TOMCAT[8. Tomcat: abre porta 8080]
+    TOMCAT --> READY((Aplicação Pronta))
+
+    style Data_Layer fill:transparent,stroke:#D35400,stroke-width:2px,stroke-dasharray: 3 3
+    style Security_Docs fill:transparent,stroke:#4B0082,stroke-width:2px,stroke-dasharray: 3 3
+```
