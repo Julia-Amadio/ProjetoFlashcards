@@ -1,8 +1,12 @@
 # 🗂️ Projeto Flashcards - Backend
 
 Este é o backend da aplicação de Flashcards, um sistema desenvolvido para auxiliar nos estudos 
-através da criação e revisão de cartões de memorização. O sistema fornece uma API RESTful 
+através da criação e revisão de cartões de memorização. A proposta é oferecer uma API RESTful 
 completa, com autenticação, gerenciamento de usuários e controle de permissões.
+
+> ⚠️ **Aviso:** este projeto está atualmente na fase inicial de **desenvolvimento e arquitetura**. 
+> As funcionalidades listadas abaixo representam o escopo proposto 
+> para a versão final da aplicação.
 
 ---
 
