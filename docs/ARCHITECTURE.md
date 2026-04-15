@@ -2,7 +2,7 @@
 Este documento descreve a fundação tecnológica do projeto de Flashcards e serve como guia 
 para todos os desenvolvedores do grupo.
 
-## 1. Arquitetura do sistema
+## <br> 1. Arquitetura do sistema
 O projeto utiliza uma arquitetura de **Sistema Distribuído**, projetada para separar 
 responsabilidades e otimizar recursos. Ela é dividida em três frentes principais:
 
@@ -20,7 +20,7 @@ Essa separação garante que, caso as APIs externas (OpenAI/Pexels) fiquem indis
 o sistema principal continua no ar, permitindo que os estudantes continuem revisando os 
 flashcards já existentes.
 
-## 2. Stack - Spring Boot
+## <br> 2. Stack - Spring Boot
 Abaixo estão as ferramentas selecionadas via Spring Initializr e a explicação 
 de qual "dor" elas resolvem no projeto:
 
@@ -57,13 +57,13 @@ e proteger as rotas de administrador para que apenas usuários autenticados crie
 Exemplo: impede que um usuário seja criado sem e-mail ou que uma palavra em mandarim venha vazia, 
 retornando um erro amigável antes mesmo de tentar salvar no banco.
 
-## 3. Stack - Python Services
+## <br> 3. Stack - Python Services
 - **FastAPI:** framework web que servirá para expor os scripts de IA como endpoints 
 que o Java pode chamar.
 - **OpenAI SDK:** para integração com o GPT-4o-mini.
 - **Edge-TTS:** para gerar áudios com vozes neurais realistas sem custo.
 
-## Diagramação
+## <br> 4. Diagramação auxiliar
 
 ### Fase 1: o trabalho do Maven (*build* e compilação)
 Antes de executar, o código legível para humanos precisa ser traduzido e empacotado. **O Maven
@@ -103,7 +103,7 @@ dentro da classe `BackendApplication` e dá o "start".
 
 ```mermaid
 graph TD
-    subgraph SpringBoot [Agente Orquestrador: Spring Boot]
+    subgraph SpringBoot [Agente orquestrador: Spring Boot]
         A[Injeção de dependências e leitura do application.properties] --> B
         
         subgraph Flyway [Flyway]
@@ -129,7 +129,7 @@ graph TD
     style Tomcat fill:transparent,stroke:#B22222,stroke-width:2px
 ```
 
-### Fase 3: atuação do Spring Boot e as Ferramentas
+### Fase 3: atuação do Spring Boot e ferramentas
 Assim que o método main chama o `SpringApplication.run()`, as ferramentas trabalham na
 seguinte sequência de orquestração:
 
