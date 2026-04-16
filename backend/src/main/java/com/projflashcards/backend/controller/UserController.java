@@ -1,6 +1,5 @@
 package com.projflashcards.backend.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -59,15 +58,31 @@ public class UserController {
         return new ResponseEntity<>(savedUser, HttpStatus.CREATED);
     }
 
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable UUID id){
-        userRepository.findById(id)
-            .ifPresentOrElse(
-                userRepository::delete,
-                () -> { throw new RuntimeException("User not found"); }
-            );
+    //Deleta um usuário específico pelo ID
+    //DELETE http://localhost:8080/users/{id}
+    @DeleteMapping("/{id}") //<-- Alterado de "/delete/{id}". Verbo HTTP (DELETE) da requisição já indica a ação
+    public ResponseEntity<Void> deleteUserById(@PathVariable UUID id){
+        Optional<User> userOptional = userRepository.findById(id);
 
-        return ResponseEntity.ok().build();
+        if (userOptional.isPresent()) {
+            /* - Anterior: quando deletado com sucesso, retornava '200 OK' (ResponseEntity.ok())
+             * - Novo: retorna '204 No Content' (melhor prática pra quando não há retorno JSON após o DELETE) */
+            userRepository.delete(userOptional.get());
+            return ResponseEntity.noContent().build(); //204
+        } else {
+            /* - Anterior: throw new RuntimeException.
+                 Sem tratativa explícita para essa exceção, jogava um 500 Internal Server Error
+             * - Novo: cai no else e retorna 404 Not Found (ResponseEntity.notFound()).
+                 Indica apenas que o recurso não existe. */
+            return ResponseEntity.notFound().build(); //404
+        }
+
+        /* Outras mudanças:
+        *  - Anterior: usava exceção (throw) como "freio". Precisava estourar erro para forçar o método a parar,
+        *    evitando que a execução continue e retorne o 200 OK na última linha.
+        *    Usa erro como controle de fluxo.
+        *  - Novo (if/else): trata cenário de "não encontrou" como regra de negócio normal.
+        *    Mais amigável e legível para quem for ler/consumir a API. */
     }
 
     //Endpoint de busca com parâmetros
