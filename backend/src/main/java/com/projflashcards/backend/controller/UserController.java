@@ -59,6 +59,17 @@ public class UserController {
         return new ResponseEntity<>(savedUser, HttpStatus.CREATED);
     }
 
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<Void> deletar(@PathVariable UUID id){
+        userRepository.findById(id)
+            .ifPresentOrElse(
+                userRepository::delete,
+                () -> { throw new RuntimeException("User not found"); }
+            );
+
+        return ResponseEntity.ok().build();
+    }
+
     //Endpoint de busca com parâmetros
     //Podemos implementar também busca com nome, com formato semelhante a este método
     //Ex.: GET http://localhost:8080/users/search?email=teste@email.com
