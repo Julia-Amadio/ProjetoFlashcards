@@ -1,5 +1,6 @@
 package com.projflashcards.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -20,8 +21,8 @@ public class User {
     @Column(nullable = false, length = 100, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
-    @JsonIgnore //Pra não sair no corpo JSON de retornos, mesmo que já hasheado
+    @Column(name = "password_hash", nullable = false, length = 255)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) //Pra não sair no corpo JSON de retornos, mesmo que já hasheado
     private String password;
 
     @Column(nullable = false, length = 20)
