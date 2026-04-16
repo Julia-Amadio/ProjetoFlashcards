@@ -85,6 +85,28 @@ public class UserController {
         *    Mais amigável e legível para quem for ler/consumir a API. */
     }
 
+    //Atualiza os dados de um usuário existente pelo ID
+    //PUT http://localhost:8080/users/{id}
+    @PutMapping("/{id}")
+    public ResponseEntity<User> updateUser(@PathVariable UUID id, @RequestBody User userDetails) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (userOptional.isPresent()) {
+            User existingUser = userOptional.get();
+
+            //Atualiza APENAS dados seguros do perfil
+            existingUser.setName(userDetails.getName());
+            existingUser.setEmail(userDetails.getEmail());
+
+            //Sem setRole() para evitar falhas de segurança
+            //Sem atualização de senha aqui por enquanto
+            User updatedUser = userRepository.save(existingUser);
+            return ResponseEntity.ok(updatedUser);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     //Endpoint de busca com parâmetros
     //Podemos implementar também busca com nome, com formato semelhante a este método
     //Ex.: GET http://localhost:8080/users/search?email=teste@email.com
