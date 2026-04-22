@@ -26,7 +26,7 @@ curl -X GET http://localhost:8080/users
 curl -X GET http://localhost:8080/users/SEU-UUID-AQUI
 ```
 
-### Atualizar usuário  por id (`PUT)
+### Atualizar usuário  por id (`PUT`)
 **ATENÇÃO:** substituir o `SEU-UUID-AQUI`.
 ```json
 curl -X PUT http://localhost:8080/users/SEU-UUID-AQUI \
