@@ -2,9 +2,9 @@ package com.projflashcards.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "users") //Mapeia para a tabela que o Flyway criou
