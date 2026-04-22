@@ -6,11 +6,10 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record UserUpdateDTO(
-        @NotBlank(message = "O nome não pode ser vazio")
+        @Pattern(regexp = "^[a-zA-Z0-9._-]+$", message = "O nome só pode conter letras, números, ponto, traço e underline.")
         @Size(min = 3, max = 50)
         String name,
 
-        @NotBlank(message = "O e-mail não pode ser vazio")
         @Email(message = "E-mail inválido")
         String email,
 
@@ -26,5 +25,4 @@ public record UserUpdateDTO(
                 message = "A senha deve conter pelo menos uma letra maiúscula, uma minúscula e um número."
         )
         String password
-) {
-}
+) { }
