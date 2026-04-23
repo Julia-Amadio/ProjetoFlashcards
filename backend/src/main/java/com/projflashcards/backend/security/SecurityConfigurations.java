@@ -23,13 +23,38 @@ public class SecurityConfigurations {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         return  httpSecurity
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.POST, "/users").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/users/**").hasRole("ROLE_ADMIN")
-                        .anyRequest().authenticated()
-                )
-                .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
-                .build();
+        /* Desabilita a proteção CSRF. Essencial para conseguir fazer requisições POST pelo Postman/Front-end
+         * Optando por JWT + Header de autorização, deve ficar desativado mesmo em prod. */        
+		.csrf(csrf -> csrf.disable())
+            //Muda a gestão de sessão para STATELESS (o padrão do Spring é criar sessão, mas com JWT não usamos isso)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(authorize -> authorize
+				//IMPORTANTE: usar .hasAuthority() ao invés de .hasRole().
+                //IMPORTANTE: liberar a rota de login, senão ninguém consegue gerar o token.
+                .requestMatchers(HttpMethod.POST, "/login").permitAll()
+                //Libera o cadastro de usuários
+				.requestMatchers(HttpMethod.POST, "/users").permitAll()
+				//Protege as rotas de listagem para apenas ADMINs
+				.requestMatchers(HttpMethod.GET, "/users/**").hasAuthority("ROLE_ADMIN")
+				//Qualquer outra requisição precisará de um token JWT válido
+				.anyRequest().authenticated()
+            )
+			// Coloca o nosso filtro de JWT ANTES do filtro padrão do Spring
+			.addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
+			.build();
     }
+
+    @Bean
+	public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    	return authenticationConfiguration.getAuthenticationManager();
+	}
+
+	/** 
+	 * --- TRAZIDO DO DEFUNTO (config.SecurityConfig) ---
+	 * O Spring precisa saber como comparar a senha digitada no login com o Hash do banco
+     */ 
+	@Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
