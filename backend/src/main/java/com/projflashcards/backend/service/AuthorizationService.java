@@ -2,6 +2,8 @@ package com.projflashcards.backend.service;
 
 import com.projflashcards.backend.model.User;
 import com.projflashcards.backend.repository.UserRepository;
+import com.projflashcards.backend.security.UserDetailsImpl;
+
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -18,10 +20,10 @@ public class AuthorizationService implements UserDetailsService {
         this.userRepository = userRepository;
     }
 
-    /*
+    /* ------------------------------ MÉTODO ANTIGO - AINDA NÃO TINHAMOS UserDetailsImpl ----------------------------
     * Null safety: a interface original UserDetailsService do Spring diz que quem implementar
     * o método nunca pode retornar um valor nulo e não pode receber um username nulo.
-    * Para evitar warnings, usa-se @NonNull no que é enviado para o método e no retorno do método. */
+    * Para evitar warnings, usa-se @NonNull no que é enviado para o método e no retorno do método.
     @Override
     @NonNull
     public UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
@@ -37,5 +39,15 @@ public class AuthorizationService implements UserDetailsService {
                 .password(user.getPassword())
                 .authorities(user.getRole()) //Ex: "ROLE_USER" ou "ROLE_ADMIN"
                 .build();
+    }*/
+
+    @Override
+    @NonNull
+    public UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado com o email: " + username));
+
+        //Mais limpo e direto:
+        return new UserDetailsImpl(user); 
     }
 }
