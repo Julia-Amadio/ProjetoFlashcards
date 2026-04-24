@@ -43,6 +43,6 @@ public class UserDetailsImpl implements UserDetails {
     @Override
     public boolean isEnabled() { return true; }
 
-    //"Bônus": método para pegar a entidade User original de dentro do contexto de segurança caso seja necessário no futuro.
+    //Método para pegar a entidade User original de dentro do contexto de segurança.
     public User getUser() { return user; }
 }

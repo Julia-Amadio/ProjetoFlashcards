@@ -24,22 +24,26 @@ public class SecurityConfigurations {
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         return  httpSecurity
         /* Desabilita a proteção CSRF. Essencial para conseguir fazer requisições POST pelo Postman/Front-end
-         * Optando por JWT + Header de autorização, deve ficar desativado mesmo em prod. */        
+         * Optando por JWT + Header de autorização, deve ficar desativado mesmo em prod. */
 		.csrf(csrf -> csrf.disable())
             //Muda a gestão de sessão para STATELESS (o padrão do Spring é criar sessão, mas com JWT não usamos isso)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authorize -> authorize
-				//IMPORTANTE: usar .hasAuthority() ao invés de .hasRole().
-                //IMPORTANTE: liberar a rota de login, senão ninguém consegue gerar o token.
-                .requestMatchers(HttpMethod.POST, "/login").permitAll()
-                //Libera o cadastro de usuários
-				.requestMatchers(HttpMethod.POST, "/users").permitAll()
-				//Protege as rotas de listagem para apenas ADMINs
-				.requestMatchers(HttpMethod.GET, "/users/**").hasAuthority("ROLE_ADMIN")
-				//Qualquer outra requisição precisará de um token JWT válido
-				.anyRequest().authenticated()
+					//IMPORTANTE: usar .hasAuthority() ao invés de .hasRole().
+
+					//IMPORTANTE: liberar a rota de login, senão ninguém consegue gerar o token.
+					.requestMatchers(HttpMethod.POST, "/login").permitAll()
+
+					//Libera o cadastro de usuários
+					.requestMatchers(HttpMethod.POST, "/users").permitAll()
+
+					//Protege rota de listagem de usuários para apenas ADMINs
+					.requestMatchers(HttpMethod.GET, "/users").hasAuthority("ROLE_ADMIN")
+
+					//Qualquer outra requisição precisará de um token JWT válido
+					.anyRequest().authenticated()
             )
-			// Coloca o nosso filtro de JWT ANTES do filtro padrão do Spring
+			//Coloca o nosso filtro de JWT ANTES do filtro padrão do Spring
 			.addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
 			.build();
     }
