@@ -1,8 +1,10 @@
 # 📚 Referência técnica: arquitetura e ferramentas
-Este documento descreve a fundação tecnológica do projeto de Flashcards e serve como guia 
-para todos os desenvolvedores do grupo.
+Este documento descreve a fundação tecnológica do projeto de Flashcards e serve
+de documentação auxiliar para todos os desenvolvedores do grupo.
 
-## <br> 1. Arquitetura do sistema
+---
+
+## 1. Arquitetura do sistema
 O projeto utiliza uma arquitetura de **Sistema Distribuído**, projetada para separar 
 responsabilidades e otimizar recursos. Ela é dividida em três frentes principais:
 
@@ -20,7 +22,9 @@ Essa separação garante que, caso as APIs externas (OpenAI/Pexels) fiquem indis
 o sistema principal continua no ar, permitindo que os estudantes continuem revisando os 
 flashcards já existentes.
 
-## <br> 2. Stack - Spring Boot
+---
+
+## 2. Stack - Spring Boot
 Abaixo estão as ferramentas selecionadas via Spring Initializr e a explicação 
 de qual "dor" elas resolvem no projeto:
 
@@ -57,13 +61,69 @@ e proteger as rotas de administrador para que apenas usuários autenticados crie
 Exemplo: impede que um usuário seja criado sem e-mail ou que uma palavra em mandarim venha vazia, 
 retornando um erro amigável antes mesmo de tentar salvar no banco.
 
-## <br> 3. Stack - Python Services
+---
+
+## 3. Stack - Python Services
 - **FastAPI:** framework web que servirá para expor os scripts de IA como endpoints 
 que o Java pode chamar.
 - **OpenAI SDK:** para integração com o GPT-4o-mini.
 - **Edge-TTS:** para gerar áudios com vozes neurais realistas sem custo.
 
-## <br> 4. Diagramação auxiliar
+---
+
+## 4. Detalhamento da arquitetura de pacotes
+A estrutura de pacotes foi desenhada seguindo o padrão de Arquitetura em Camadas,
+visando o desacoplamento e a facilidade de manutenção.
+
+### 📂 `com.projflashcards.backend.model` & `repository`
+* `model`: representação fiel do banco de dados (*entities*). Utiliza `UUID` para IDs dos
+  usuários (incluindo casos onde tabelas utilizam os mesmos como chaves estrangeiras) e `Long`
+  para IDs específicos de outras entidades, visando segurança e escalabilidade em
+  sistemas distribuídos.
+* `repository`: camada de persistência que utiliza o Spring Data JPA para abstrair as
+  *queries* SQL, permitindo que o foco permaneça nos dados e não na sintaxe do banco.
+
+### 📂 `com.projflashcards.backend.service`
+Onde reside a verdade sobre as regras de negócio de cada entidade em particular.
+* `AuthorizationService`: serviço técnico que implementa interfaces do Spring Security
+  (`UserDetailsService`) para converter usuários do banco em objetos que o Spring entende.
+* `UserService`:
+    * Contém regras de permissão fina no `validatePermissions`, garantindo que um usuário comum
+      não altere dados de outro;
+    * Define as regras do corpo de requisição das rotas presentes no `controller`, garantindo a
+      integridade dos dados inseridos/alterados no banco e gerenciando o ciclo de vida da entidade.
+
+### 📂 `com.projflashcards.backend.security`
+Este é o pacote "transversal" do sistema. Ele não lida com regras de negócio de flashcards,
+mas com a integridade do acesso.
+* `TokenService`: especialista em JWT e criptografia. Sua função é construir e validar o
+  Java Web Token, possuindo dois métodos:
+    * `generateToken`: constrói o token, embutindo no mesmo de forma criptografada o email do
+      usuário ao qual ele pertence, além de definir seu tempo de expiração;
+    * `validateToken`: verifica se o token presente no *header* não está expirado e se possui
+      as informações que devem obrigatoriamente estar presentes e criptografadas no mesmo.
+* `SecurityFilter`: age como interceptor e garante que ninguém chegue aos Controllers sem que
+  o `SecurityContextHolder` esteja devidamente preenchido.
+* `SecurityConfigurations`: onde definimos a quais rotas são públicas e quais são privadas.
+* `UserDetailsImpl`: ponte entre a entidade `User` e o Spring Security. Ele "empacota" os dados 
+do usuário (como e-mail, senha e roles) no formato exato que a arquitetura do Spring exige para 
+gerenciar a sessão ativa e validar permissões a cada requisição.
+
+### 📂 `com.projflashcards.backend.controller`
+Camada dedicada ao tratamento do protocolo HTTP.
+* Controllers de **DOMÍNIO** (ex: `UserController`): atuam como delegados. Recebem a requisição,
+  validam o `DTO` e passam a informação limpa para o `Service`. Não possuem lógica de decisão.
+* Controllers de **INFRAESTRUTURA** (ex: ``AuthenticationController``): diferem dos demais, pois
+  são o ponto de entrada da segurança. Eles orquestram o `AuthenticationManager`
+  para validar credenciais.
+
+### 📂 `com.projflashcards.backend.dto`
+Crucial para o desacoplamento. Garante que mudanças na estrutura da tabela (Entity) não quebrem o
+contrato com o Frontend (React), além de evitar a exposição de dados sensíveis como o `password_hash`.
+
+---
+
+## 5. Diagramação auxiliar
 
 ### Fase 1: o trabalho do Maven (*build* e compilação)
 Antes de executar, o código legível para humanos precisa ser traduzido e empacotado. **O Maven
@@ -167,3 +227,5 @@ graph TD
     style Data_Layer fill:transparent,stroke:#D35400,stroke-width:2px,stroke-dasharray: 3 3
     style Security_Docs fill:transparent,stroke:#4B0082,stroke-width:2px,stroke-dasharray: 3 3
 ```
+
+---
