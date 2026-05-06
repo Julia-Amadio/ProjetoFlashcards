@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -31,6 +33,24 @@ public class User {
     //OffsetDateTime mapeia perfeitamente o TIMESTAMPTZ do Postgres
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
+
+    //Mapeamento Muitos-para-Muitos
+    @ManyToMany
+    @JoinTable(
+            name = "user_favorite_decks", //Nome exato da tabela no banco
+            joinColumns = @JoinColumn(name = "user_id"), //Chave estrangeira desta classe (User)
+            inverseJoinColumns = @JoinColumn(name = "deck_id") //Chave estrangeira da outra classe (Deck)
+    )
+    private Set<Deck> favoriteDecks = new HashSet<>();
+
+    // Getters e Setters
+    public Set<Deck> getFavoriteDecks() {
+        return favoriteDecks;
+    }
+
+    public void setFavoriteDecks(Set<Deck> favoriteDecks) {
+        this.favoriteDecks = favoriteDecks;
+    }
 
     //Construtor vazio exigido pelo Hibernate
     public User() { }
