@@ -5,6 +5,7 @@ import com.projflashcards.backend.model.Deck;
 import com.projflashcards.backend.model.User;
 import com.projflashcards.backend.repository.DeckRepository;
 import com.projflashcards.backend.repository.UserRepository;
+import com.projflashcards.backend.security.SecurityUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,15 +18,21 @@ public class UserFavoriteService {
 
     private final UserRepository userRepository;
     private final DeckRepository deckRepository;
+    private final SecurityUtils securityUtils; //<--- NOVA INJEÇÃO
 
     //Injeção de dependência via construtor (Boa prática do Spring)
-    public UserFavoriteService(UserRepository userRepository, DeckRepository deckRepository) {
+    public UserFavoriteService(UserRepository userRepository, DeckRepository deckRepository,
+                               SecurityUtils securityUtils) {
         this.userRepository = userRepository;
         this.deckRepository = deckRepository;
+        this.securityUtils = securityUtils;
     }
 
+    //Add um deck à lista de favoritos
     @Transactional
     public void addFavoriteDeck(UUID userId, Long deckId) {
+        securityUtils.validatePermissions(userId);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
@@ -37,9 +44,29 @@ public class UserFavoriteService {
         userRepository.save(user);
     }
 
-    //Método extra para testar se o favorito foi salvo listando eles
+    //Remove deck da lista de favoritos
+    @Transactional
+    public void removeFavoriteDeck(UUID userId, Long deckId) {
+        securityUtils.validatePermissions(userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        //removeIf percorre a lista e remove o deck que tiver o ID correspondente
+        boolean removed = user.getFavoriteDecks().removeIf(deck -> deck.getId().equals(deckId));
+
+        if (!removed) {
+            throw new RuntimeException("Este deck não está nos favoritos do usuário");
+        }
+
+        userRepository.save(user);
+    }
+
+    //Lista decks favoritos do usuário
     @Transactional(readOnly = true)
     public List<DeckSummaryDTO> getUserFavorites(UUID userId) {
+        securityUtils.validatePermissions(userId);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 

@@ -35,4 +35,14 @@ public class UserFavoriteController {
         List<DeckSummaryDTO> favorites = favoriteService.getUserFavorites(userId);
         return ResponseEntity.ok(favorites);
     }
+
+    //3. NOVO: Endpoint para remover um favorito (DELETE)
+    @DeleteMapping("/{userId}/favorites/{deckId}")
+    public ResponseEntity<Void> removeFavoriteDeck(
+            @PathVariable UUID userId,
+            @PathVariable Long deckId) {
+
+        favoriteService.removeFavoriteDeck(userId, deckId);
+        return ResponseEntity.noContent().build(); // Retorna 204 No Content
+    }
 }
