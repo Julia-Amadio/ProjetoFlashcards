@@ -5,6 +5,7 @@ import com.projflashcards.backend.dto.UserResponseDTO;
 import com.projflashcards.backend.dto.UserUpdateDTO;
 import com.projflashcards.backend.model.User;
 import com.projflashcards.backend.repository.UserRepository;
+import com.projflashcards.backend.security.SecurityUtils;
 import com.projflashcards.backend.security.UserDetailsImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,10 +25,13 @@ public class UserService {
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SecurityUtils securityUtils; //<--- NOVA INJEÇÃO
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       SecurityUtils securityUtils) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.securityUtils = securityUtils;
     }
 
     @Transactional
@@ -52,7 +56,7 @@ public class UserService {
 
     @Transactional
     public UserResponseDTO updateUser(UUID id, UserUpdateDTO dto) {
-        validatePermissions(id); // <--- Checagem
+        securityUtils.validatePermissions(id); //<--- Chamando agora do Utils
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
@@ -88,44 +92,9 @@ public class UserService {
     }
 
     public Optional<UserResponseDTO> findById(UUID id) {
-        validatePermissions(id); // <--- Checagem
+        securityUtils.validatePermissions(id);
 
         return userRepository.findById(id)
                 .map(UserResponseDTO::new);
-    }
-
-    //Método auxiliar para garantir que o usuário padrão possa visualizar ou alterar SOMENTE seus próprios dados
-    private void validatePermissions(UUID targetID) {
-        //Pega a autenticação atual do contexto do Spring Security
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        //1. Valida se a autenticação existe e se está de fato autenticada
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("ACESSO NEGADO: Usuário não autenticado.");
-        }
-
-        //2. Verifica se o Principal é exatamente do tipo que esperamos.
-        //Pega do nosso UserDetailsImpl (que tem o usuário do banco)
-        //O Java já faz o cast automático para a variável 'userDetails' aqui mesmo.
-        if (!(authentication.getPrincipal() instanceof UserDetailsImpl userDetails)) {
-            throw new AccessDeniedException("ACESSO NEGADO: Credenciais inválidas.");
-        }
-
-        var signedUser = userDetails.getUser();
-
-        //3. Garantia extra de que o usuário existe no objeto
-        if (signedUser == null) {
-            throw new AccessDeniedException("ACESSO NEGADO: Detalhes do usuário não encontrados.");
-        }
-
-        //4. Verifica se ele NÃO é admin >E< se o ID dele é DIFERENTE do ID que ele está tentando acessar
-        //Usa Yoda Condition: String literal ("ROLE_ADMIN") antes do .equals()
-        //Evita NPE caso signedUser.getRole() retorne null por algum motivo bizarro no banco
-        boolean isAdmin = "ROLE_ADMIN".equals(signedUser.getRole());
-        boolean isOwner = signedUser.getId().equals(targetID);
-
-        if (!isAdmin && !isOwner) {
-            throw new AccessDeniedException("ACESSO NEGADO: você não tem permissão para acessar os dados de outro usuário.");
-        }
     }
 }
