@@ -1,0 +1,23 @@
+# Build artifacts do Maven (o Docker vai gerar tudo isso de novo dentro do container)
+target/
+*.class
+
+# Nunca deixe segredos irem pro contexto de build nem pra imagem
+.env
+*.env
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Sistema operacional
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Docker
+../docker-compose.yml
+Dockerfile*
