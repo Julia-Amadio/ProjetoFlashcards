@@ -5,6 +5,22 @@ de documentação auxiliar para todos os desenvolvedores do grupo.
 ---
 
 ## 1. Arquitetura do sistema
+```
+ProjetoFlashcards/
+├── docs/
+│   ├── ARCHITECTURE.md       # este arquivo
+│   └── CURL_CHEATSHEET.md    # comandos cURL testes de requisição HTTP
+├── backend/
+│   ├── src.main.java.com.projflashcards.backend/    # backend do projeto construído com Spring Boot
+│   ├── resources/
+│   │   ├── db.migration/             # migrações Flyway
+│   │   └── application.properties    # configurações do Spring Boot (conexão BD, comportamentos, etc.)
+│   ├── docker-compose.yml    # ambiente local do backend isolado via Docker
+│   └── pom.xml               # dependências do backend, gerenciadas pelo Maven
+├── frontend/
+└── python-services/          # serviço de IA para geração de flashcards
+```
+
 O projeto utiliza uma arquitetura de **Sistema Distribuído**, projetada para separar 
 responsabilidades e otimizar recursos. Ela é dividida em três frentes principais:
 
