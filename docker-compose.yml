@@ -1,16 +1,20 @@
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: postgres-flashcards
+  backend:
+    build: ./backend
+    container_name: backend-flashcards
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: flashcards_db
-      POSTGRES_USER: flashcards_admin
-      POSTGRES_PASSWORD: password123
+    depends_on:
+      - python-services
+    env_file:
+      - ./backend/.env
     ports:
-      - "5434:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "8080:8080"
 
-volumes:
-  postgres_data:
+  python-services:
+    build: ./python-services
+    container_name: python-services-flashcards
+    restart: unless-stopped
+    env_file:
+      - ./python-services/.env
+    ports:
+      - "8000:8000"
