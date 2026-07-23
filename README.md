@@ -10,6 +10,29 @@ completa, com autenticação, gerenciamento de usuários e controle de permissõ
 
 ---
 
+## Frontend React
+
+O primeiro fluxo do frontend está em `frontend/`, construído com React, TypeScript e Vite. Inclui
+cadastro e login integrados ao Spring, sessão JWT persistida, dashboard responsivo, favoritos locais
+e uma demonstração da experiência de revisão. Os decks demonstrativos ficam isolados em
+`frontend/src/data/decks.ts` até a API disponibilizar controllers de decks e flashcards.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+O Vite abre em `http://localhost:5173` e encaminha `/api` ao backend em `http://localhost:8080`.
+Para outro servidor, copie `.env.example` para `.env` e ajuste `VITE_API_URL`.
+
+```bash
+npm run lint
+npm run build
+```
+
+---
+
 ## Stack
 
 * **Java 21**
