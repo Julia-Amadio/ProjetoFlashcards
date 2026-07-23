@@ -70,3 +70,13 @@ media_temp/
 *.jpg
 *.jpeg
 *.png
+.vite
+
+# --- Agents ---
+.cursor/
+.cursorignore
+.cursor_mcp.json
+.claude/
+.aiignore
+.llmignore
+.gptcache/
