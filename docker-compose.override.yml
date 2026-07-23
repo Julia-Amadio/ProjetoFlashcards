@@ -4,7 +4,7 @@
 # este arquivo por completo. Ele nunca deve chegar em produção.
 services:
   db:
-    image: postgres:15-alpine
+    image: docker.io/library/postgres:15-alpine
     container_name: postgres-flashcards
     restart: unless-stopped
     environment:
