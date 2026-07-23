@@ -1,5 +1,4 @@
 -- 1. Adiciona a coluna de dificuldade
--- Nível de proficiência - Ex.: CEFR (A-B-C, 1-2), HSK, JLPT (N1-N5), etc.
 ALTER TABLE decks ADD COLUMN difficulty_level VARCHAR(50);
 
 -- 2. Renomeia a constraint automática para o nosso padrão (opcional, mas recomendado)
