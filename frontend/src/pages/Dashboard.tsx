@@ -2,11 +2,16 @@ import { ArrowRight, BookOpen, Clock3, Flame, Heart, Search } from 'lucide-react
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { sampleDecks } from '../data/decks'
+import { sampleCardsByDeck } from '../data/decks'
+import { loadPreferences } from '../lib/preferences'
+import { loadStudyProgress, progressPercentage } from '../lib/studyProgress'
 
 export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path: string) => void; favoritesOnly?: boolean }) {
   const { session } = useAuth()
   const [query, setQuery] = useState('')
   const [difficulty, setDifficulty] = useState('all')
+  const email = session?.email ?? 'guest'
+  const preferences = loadPreferences(email)
   const favoritesKey = `karta.favorites.${session?.email ?? 'guest'}`
   const [favorites, setFavorites] = useState<number[]>(() => {
     try {
@@ -20,6 +25,11 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
   const currentDate = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toLocaleUpperCase('pt-BR')
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR')
   const difficulties = [...new Set(sampleDecks.map(deck => deck.difficultyLevel))]
+  const deckProgress = Object.fromEntries(sampleDecks.map(deck => {
+    const cardCount = sampleCardsByDeck[deck.id]?.length ?? 1
+    const saved = loadStudyProgress(email, deck.id, cardCount)
+    return [deck.id, saved.updatedAt ? progressPercentage(saved, cardCount) : deck.progress]
+  }))
   const filtered = sampleDecks.filter(deck => {
     const matchesQuery = `${deck.title} ${deck.language}`.toLocaleLowerCase('pt-BR').includes(normalizedQuery)
     const matchesDifficulty = difficulty === 'all' || deck.difficultyLevel === difficulty
@@ -41,7 +51,7 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
     </section>
     {!favoritesOnly && <section className="stats-grid">
       <article><span className="stat-icon coral"><Flame /></span><div><b>4</b><span>dias de sequência</span></div><small>Seu recorde: 7</small></article>
-      <article><span className="stat-icon blue"><BookOpen /></span><div><b>86</b><span>cards estudados</span></div><small>+12 nesta semana</small></article>
+      <article><span className="stat-icon blue"><BookOpen /></span><div><b>86</b><span>cards estudados</span></div><small>Meta diária: {preferences.dailyGoal} cards</small></article>
       <article><span className="stat-icon yellow"><Clock3 /></span><div><b>1h 24</b><span>tempo de estudo</span></div><small>Nos últimos 7 dias</small></article>
     </section>}
     <section className="library-section">
@@ -49,7 +59,7 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
       <div className="deck-grid">
         {filtered.map(deck => <article className="deck-card" key={deck.id}>
           <div className="deck-visual" style={{ background: deck.accent }}><span>{deck.symbol}</span><button className={favorites.includes(deck.id) ? 'favorited' : ''} onClick={() => toggleFavorite(deck.id)} aria-label={favorites.includes(deck.id) ? `Remover ${deck.title} dos favoritos` : `Adicionar ${deck.title} aos favoritos`} aria-pressed={favorites.includes(deck.id)}><Heart /></button></div>
-          <div className="deck-body"><div className="deck-meta"><span>{deck.language}</span><i />{deck.difficultyLevel}</div><h3>{deck.title}</h3><p>{deck.description}</p><div className="progress-label"><span>{deck.cardCount} cards</span><b>{deck.progress}%</b></div><div className="progress-track"><i style={{ width: `${deck.progress}%`, background: deck.accent }} /></div><button className="text-button" onClick={() => navigate(`/study/${deck.id}`)}>{deck.progress ? 'Continuar deck' : 'Começar deck'} <ArrowRight /></button></div>
+          <div className="deck-body"><div className="deck-meta"><span>{deck.language}</span><i />{deck.difficultyLevel}</div><h3>{deck.title}</h3><p>{deck.description}</p><div className="progress-label"><span>{deck.cardCount} cards</span><b>{deckProgress[deck.id]}%</b></div><div className="progress-track"><i style={{ width: `${deckProgress[deck.id]}%`, background: deck.accent }} /></div><button className="text-button" onClick={() => navigate(`/study/${deck.id}`)}>{deckProgress[deck.id] ? 'Continuar deck' : 'Começar deck'} <ArrowRight /></button></div>
         </article>)}
       </div>
       {!filtered.length && <div className="empty-state"><Heart /><h3>Nenhum deck por aqui ainda</h3><p>Tente outra busca ou favorite um deck na biblioteca.</p></div>}

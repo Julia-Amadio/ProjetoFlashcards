@@ -3,6 +3,7 @@ import { AppShell } from './components/AppShell'
 import { useAuth } from './context/AuthContext'
 import { AuthPage } from './pages/AuthPage'
 import { Dashboard } from './pages/Dashboard'
+import { SettingsPage } from './pages/SettingsPage'
 import { StudyPage } from './pages/StudyPage'
 
 function routeFromLocation() { return window.location.pathname }
@@ -17,6 +18,8 @@ export default function App() {
   const authenticatedRoute = route === '/login' || route === '/register' ? '/' : route
   const studyMatch = authenticatedRoute.match(/^\/study\/(\d+)\/?$/)
   if (studyMatch) return <StudyPage deckId={Number(studyMatch[1])} navigate={navigate} />
-  const page = authenticatedRoute === '/favorites' ? 'favorites' : 'home'
-  return <AppShell page={page} navigate={navigate}><Dashboard navigate={navigate} favoritesOnly={page === 'favorites'} /></AppShell>
+  const page = authenticatedRoute === '/favorites' ? 'favorites' : authenticatedRoute === '/settings' ? 'settings' : 'home'
+  return <AppShell page={page} navigate={navigate}>
+    {page === 'settings' ? <SettingsPage navigate={navigate} /> : <Dashboard navigate={navigate} favoritesOnly={page === 'favorites'} />}
+  </AppShell>
 }

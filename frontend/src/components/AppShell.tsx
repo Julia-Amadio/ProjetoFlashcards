@@ -31,7 +31,7 @@ export function AppShell({ children, page, navigate }: Props) {
         </nav>
         <div className="sidebar-callout"><Sparkles size={18} /><strong>Um pouco todo dia</strong><span>Consistência vence intensidade.</span></div>
         <div className="sidebar-bottom">
-          <button><Settings size={18} /> Configurações</button>
+          <button className={page === 'settings' ? 'active' : ''} onClick={() => go('/settings')}><Settings size={18} /> Configurações</button>
           <button onClick={() => { logout(); navigate('/login') }}><LogOut size={18} /> Sair</button>
         </div>
       </aside>

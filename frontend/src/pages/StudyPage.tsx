@@ -1,14 +1,16 @@
 import { ArrowLeft, CheckCircle2, RotateCcw, Volume2, X } from 'lucide-react'
-import { useCallback, useEffect, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { sampleCardsByDeck, sampleDecks } from '../data/decks'
+import { loadPreferences } from '../lib/preferences'
+import { loadStudyProgress, saveStudyProgress, type StudyResults } from '../lib/studyProgress'
 import type { Deck, Flashcard } from '../types'
 
 type Rating = 'again' | 'almost' | 'easy'
-type Results = Record<Rating, number>
-
-const emptyResults: Results = { again: 0, almost: 0, easy: 0 }
+const emptyResults: StudyResults = { again: 0, almost: 0, easy: 0 }
 
 export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (path: string) => void }) {
+  const { session } = useAuth()
   const deck = sampleDecks.find(item => item.id === deckId)
   const cards = sampleCardsByDeck[deckId]
 
@@ -23,16 +25,20 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
     </main>
   }
 
-  return <StudySession deck={deck} cards={cards} navigate={navigate} />
+  return <StudySession deck={deck} cards={cards} email={session?.email ?? 'guest'} navigate={navigate} />
 }
 
-function StudySession({ deck, cards, navigate }: { deck: Deck; cards: Flashcard[]; navigate: (path: string) => void }) {
-  const [index, setIndex] = useState(0)
-  const [revealed, setRevealed] = useState(false)
-  const [completed, setCompleted] = useState(false)
-  const [results, setResults] = useState<Results>(emptyResults)
+function StudySession({ deck, cards, email, navigate }: { deck: Deck; cards: Flashcard[]; email: string; navigate: (path: string) => void }) {
+  const initialProgress = useState(() => loadStudyProgress(email, deck.id, cards.length))[0]
+  const preferences = useState(() => loadPreferences(email))[0]
+  const [index, setIndex] = useState(initialProgress.index)
+  const [revealed, setRevealed] = useState(initialProgress.revealed)
+  const [completed, setCompleted] = useState(initialProgress.completed)
+  const [results, setResults] = useState<StudyResults>(initialProgress.results)
+  const readyToPersist = useRef(false)
   const card = cards[index]
   const speechLanguage = deck.speechLanguage
+  const hasProgress = index > 0 || revealed || Object.values(results).some(value => value > 0)
 
   const rate = useCallback((rating: Rating) => {
     setResults(current => ({ ...current, [rating]: current[rating] + 1 }))
@@ -56,10 +62,36 @@ function StudySession({ deck, cards, navigate }: { deck: Deck; cards: Flashcard[
     window.speechSynthesis.speak(utterance)
   }, [card.word, speechLanguage])
 
+  const exitStudy = useCallback(() => {
+    if (preferences.confirmExit && !completed && hasProgress && !window.confirm('Deseja sair desta sessão? Seu progresso ficará salvo.')) return
+    navigate('/')
+  }, [completed, hasProgress, navigate, preferences.confirmExit])
+
   function speakFromButton(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
     speak()
   }
+
+  useEffect(() => {
+    if (!readyToPersist.current) {
+      readyToPersist.current = true
+      return
+    }
+    saveStudyProgress(email, deck.id, { index, revealed, completed, results })
+  }, [completed, deck.id, email, index, results, revealed])
+
+  useEffect(() => {
+    if (preferences.autoplayAudio && !completed) speak()
+  }, [completed, index, preferences.autoplayAudio, speak])
+
+  useEffect(() => {
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      if (!preferences.confirmExit || completed || !hasProgress) return
+      event.preventDefault()
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload)
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload)
+  }, [completed, hasProgress, preferences.confirmExit])
 
   useEffect(() => {
     function handleKeyboard(event: KeyboardEvent) {
@@ -67,7 +99,7 @@ function StudySession({ deck, cards, navigate }: { deck: Deck; cards: Flashcard[
       if (target.matches('input, textarea, select')) return
 
       if (event.key === 'Escape') {
-        navigate('/')
+        exitStudy()
         return
       }
       if (completed) return
@@ -89,10 +121,10 @@ function StudySession({ deck, cards, navigate }: { deck: Deck; cards: Flashcard[
 
     window.addEventListener('keydown', handleKeyboard)
     return () => window.removeEventListener('keydown', handleKeyboard)
-  }, [completed, navigate, rate, revealed, speak])
+  }, [completed, exitStudy, rate, revealed, speak])
 
   return <div className="study-page">
-    <header className="study-head"><button className="text-button muted" onClick={() => navigate('/')}><ArrowLeft /> Voltar</button><div><b>{deck.title}</b><span>{completed ? 'Sessão concluída' : `${index + 1} de ${cards.length}`}</span></div><button className="icon-button" onClick={() => navigate('/')} aria-label="Encerrar sessão"><X /></button></header>
+    <header className="study-head"><button className="text-button muted" onClick={exitStudy}><ArrowLeft /> Voltar</button><div><b>{deck.title}</b><span>{completed ? 'Sessão concluída' : `${index + 1} de ${cards.length}`}</span></div><button className="icon-button" onClick={exitStudy} aria-label="Encerrar sessão"><X /></button></header>
     <div className="study-progress"><i style={{ width: `${completed ? 100 : ((index + 1) / cards.length) * 100}%`, background: deck.accent }} /></div>
     {completed ? <section className="study-complete" aria-live="polite">
       <span className="complete-icon"><CheckCircle2 /></span>
