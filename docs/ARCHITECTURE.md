@@ -5,6 +5,25 @@ de documentação auxiliar para todos os desenvolvedores do grupo.
 ---
 
 ## 1. Arquitetura do sistema
+```
+ProjetoFlashcards/
+├── docs/
+│   ├── ARCHITECTURE.md       # este arquivo
+│   └── API_CHEATSHEET.md     # exemplos de requisição (cURL + Postman) para as rotas já existentes
+├── docker-compose.yml           # orquestra backend + python-services (usado em produção)
+├── docker-compose.override.yml  # mesclado automaticamente por cima do normal em ambiente local/dev
+├── backend/
+│   ├── src.main.java.com.projflashcards.backend/    # backend do projeto construído com Spring Boot
+│   ├── resources/
+│   │   ├── db.migration/             # migrações Flyway
+│   │   └── application.properties    # configurações do Spring Boot (conexão BD, comportamentos, etc.)
+│   ├── Dockerfile            # build multi-stage do backend (Maven -> JRE)
+│   └── pom.xml               # dependências do backend, gerenciadas pelo Maven
+├── frontend/
+└── python-services/          # serviço de IA para geração de flashcards
+    └── Dockerfile             # build multi-stage do serviço Python (builder -> runtime)
+```
+
 O projeto utiliza uma arquitetura de **Sistema Distribuído**, projetada para separar 
 responsabilidades e otimizar recursos. Ela é dividida em três frentes principais:
 
@@ -21,6 +40,37 @@ dessas bibliotecas do backend principal.
 Essa separação garante que, caso as APIs externas (OpenAI/Pexels) fiquem indisponíveis, 
 o sistema principal continua no ar, permitindo que os estudantes continuem revisando os 
 flashcards já existentes.
+
+### 1.1 `docker-compose.yml` vs `docker-compose.override.yml`
+O projeto é orquestrado por dois arquivos Compose na raiz, cada um pensado para um cenário
+diferente:
+
+* **`docker-compose.yml` (normal):** o arquivo "de produção". Sobe `backend` e `python-services`
+  e **não** sobe nenhum banco de dados — o backend se conecta direto ao PostgreSQL na nuvem
+  (Neon), lendo a `DB_URL`/credenciais do `backend/.env` (arquivo que nunca é commitado, ver
+  `.gitignore`).
+* **`docker-compose.override.yml` (dev/homologação):** sobe adicionalmente um container `db`
+  com PostgreSQL local (porta **5434**, escolhida porque as portas padrão 5432/5433 já estavam
+  ocupadas por outros bancos na máquina) e **sobrescreve** as variáveis de conexão do `backend`
+  para apontar para esse banco local em vez do Neon.
+
+O comportamento de mesclagem é automático e é assim que o Docker Compose funciona por padrão:
+sempre que você roda `docker compose up` **sem especificar `-f` explicitamente**, o Compose
+procura por um arquivo chamado exatamente `docker-compose.override.yml` na mesma pasta e o
+mescla por cima do `docker-compose.yml`. Ou seja, o comportamento "dev" é o **padrão** ao rodar
+localmente — para rodar no modo "prod" (só o Neon, sem o Postgres local), é necessário informar
+`-f docker-compose.yml` explicitamente, o que faz o Compose ignorar o override por completo.
+
+Essa escolha (override implícito) é o que permite que o mesmo `application.properties` funcione
+nos dois cenários sem nenhuma alteração de código — ver a nota sobre o Flyway na seção 2, que
+explica como o Spring Boot decide sozinho, em tempo de execução, se conecta no Neon ou no
+Postgres local, dependendo unicamente da presença do `backend/.env`.
+
+> **Por que às vezes testar contra o Neon mesmo em desenvolvimento?** Ainda que o override seja o
+> padrão para o dia a dia (evita depender de internet/custo do banco na nuvem), rodar
+> explicitamente com `-f docker-compose.yml` de vez em quando é importante para confirmar que os
+> dados estão sendo inseridos corretamente no banco real de produção antes de um deploy — os
+> comandos práticos para os dois cenários estão no `README.md`.
 
 ---
 
@@ -227,5 +277,94 @@ graph TD
     style Data_Layer fill:transparent,stroke:#D35400,stroke-width:2px,stroke-dasharray: 3 3
     style Security_Docs fill:transparent,stroke:#4B0082,stroke-width:2px,stroke-dasharray: 3 3
 ```
+
+---
+
+## 6. Fluxo de geração de flashcards via IA: quem converte o quê
+
+Uma dúvida recorrente ao desenhar a comunicação Java ↔ Python: já que os dois módulos
+**poderiam** transformar o JSON cru devolvido pelo LLM no formato final, qual dos dois deve
+fazer essa conversão? A resposta curta: **os dois, mas cada um validando uma coisa diferente.**
+Quem insere no banco, de fato, é sempre o Java — isso não é negociável, já que só ele possui as
+`Entities`/JPA e a conexão com o PostgreSQL. Mas a conversão/validação do JSON acontece em
+**duas camadas**, uma em cada módulo:
+
+1. **Python (camada 1 — a IA respondeu direito?):** o `python-services` chama o LLM e usa
+   **Pydantic** (já presente no `requirements.txt`) para forçar a resposta a bater com um
+   contrato combinado entre os dois módulos (ex: `{"deckTitle": ..., "cards": [{"front": ...,
+   "back": ...}]}`). Essa validação existe pra pegar alucinação ou erro de formatação da IA o
+   mais cedo possível — antes de gastar uma chamada de rede pro Java. **Importante:** o Python
+   não precisa (e não deve) saber nada sobre tabelas, colunas ou nomes de Entities do banco. Ele
+   só conhece o contrato JSON combinado, nada de schema do Postgres — isso mantém os dois
+   módulos desacoplados (se uma migration do Flyway mudar amanhã, o Python nem fica sabendo).
+
+2. **Java (camada 2 — isso pode virar linha no banco?):** o Java recebe esse JSON já
+   estruturado, mas **não confia nele às cegas** só porque veio validado do outro lado. Ele
+   valida de novo com seu próprio `DTO` (Bean Validation), do mesmo jeito que já faz hoje com
+   `UserCreateDTO`/`UserUpdateDTO`. Essa é a fronteira de confiança de verdade: não importa a
+   origem do dado (Python, Postman, um bug em outro serviço), ninguém grava direto na tabela sem
+   passar pelo portão do DTO.
+
+> **NOTA:** as duas camadas não são redundantes porque verificam coisas diferentes. A validação
+> do Python garante que **a IA respondeu no formato esperado**. A validação do Java garante que
+> **o dado pode se tornar uma linha íntegra no banco**. Uma camada cuida da confiabilidade do
+> LLM; a outra cuida da integridade da persistência.
+
+### Quem chama quem
+O fluxo é sempre disparado pelo Java, nunca o contrário — o `python-services` não deve ser
+acessível diretamente pelo Frontend:
+
+```mermaid
+sequenceDiagram
+    participant C as Cliente (ROLE_ADMIN)
+    participant J as Backend (Spring Boot)
+    participant P as python-services (FastAPI)
+    participant L as LLM (OpenAI)
+    participant DB as PostgreSQL
+
+    C->>J: POST /decks/generate (JWT com ROLE_ADMIN)
+    J->>P: chama o serviço de geração (rede interna do Compose)
+    P->>L: monta o prompt e envia
+    L-->>P: resposta em texto/JSON cru
+    P->>P: valida e molda a resposta (Pydantic)
+    P-->>J: JSON já estruturado, no contrato combinado
+    J->>J: valida de novo via DTO (Bean Validation)
+    J->>DB: INSERT via JPA/Entities
+    J-->>C: Deck criado
+```
+
+### Reflexo no `SecurityConfigurations`
+A rota que dispara a geração é uma ação de ADMIN, então precisa de uma regra explícita,
+seguindo o mesmo padrão das demais rotas já comentadas na classe:
+```java
+.requestMatchers(HttpMethod.POST, "/decks/generate").hasAuthority("ROLE_ADMIN")
+```
+
+> **NOTA — sobre a exposição do `python-services`:** hoje, em ambiente de teste, a porta 8000 do
+> `python-services` é publicada para o host (`ports: "8000:8000"`) só para facilitar validação
+> manual. Container-to-container dentro da rede do Compose **não precisa** dessa porta publicada
+> para se comunicar — `backend` já enxerga `python-services:8000` pelo nome do serviço. Antes de
+> qualquer deploy real, vale reavaliar se essa porta deve continuar exposta publicamente, já que
+> o `python-services` hoje não tem autenticação própria e depende inteiramente do Java já ter
+> barrado o acesso antes de chamá-lo.
+
+### Possíveis mudanças futuras (ainda não aplicadas)
+Os pontos abaixo são melhorias identificadas, mas propositalmente **não implementadas ainda** —
+ficam registradas aqui como próximos passos quando o projeto se aproximar de um deploy real:
+
+1. **Remover o `ports: "8000:8000"` do `docker-compose.yml` de produção.** Esse mapeamento só
+   serve para expor a porta do container para fora do Docker (o host, e por extensão a internet
+   caso o host tenha IP público). Como a comunicação `backend` → `python-services` já acontece
+   pela rede interna do Compose (via nome do serviço, sem precisar de porta publicada), remover
+   esse mapeamento em prod fecha o acesso direto de qualquer pessoa de fora, sem quebrar nada
+   entre os dois módulos.
+2. **Mover esse mesmo `ports:` para o `docker-compose.override.yml` (dev).** Assim, em ambiente
+   de desenvolvimento continua sendo possível acessar `localhost:8000` livremente (Postman,
+   Swagger UI, testes manuais), mas essa conveniência não vaza para produção — o compose normal
+   simplesmente não teria mais essa porta publicada.
+3. **Adicionar um segredo compartilhado entre Java e Python** (ex: header `X-Internal-Token`,
+   validado a partir de uma env var que só os dois módulos conhecem) como camada extra de defesa.
+   Mesmo sem a porta exposta, isso protege contra: reexposição acidental da porta no futuro, ou o
+   projeto crescer e outro serviço não relacionado acabar entrando na mesma rede Docker.
 
 ---

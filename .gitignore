@@ -71,4 +71,36 @@ media_temp/
 *.jpeg
 *.png
 
+#--- Front ---
 .vite
+
+#--- AI Coding ---
+.cursor/
+.cursorignore
+.cursor_mcp.json
+.windsurf/
+.claude/
+.gemini/
+.llmignore
+# Local scratchpads and AI prompt drafts
+*.prompt.md
+/ai-scratchpad/
+.ai-prompts/
+# Temporary context or diagnostic dumps
+ai_debug.log
+agent_workspace_dump.*
+# Dedicated AI Ignore configuration CLI tools
+.aiignore
+.uignore
+# LangChain / LangGraph / CrewAI / AutoGen logs
+agent_run*.json
+logs/
+.langchain/
+.phoenix/
+traceloop.log
+# Model Caches & Downloaded Weights
+.cache/
+models/
+*.bin
+*.gguf
+*.onnx

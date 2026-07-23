@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    container_name: backend-flashcards
+    restart: unless-stopped
+    depends_on:
+      - python-services
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8080:8080"
+
+  python-services:
+    build: ./python-services
+    container_name: python-services-flashcards
+    restart: unless-stopped
+    env_file:
+      - path: ./python-services/.env
+        required: false
+    ports:
+      - "8000:8000"

@@ -1,0 +1,13 @@
+# Normaliza terminações de linha para LF no repositório e no checkout,
+# independente do SO/config local de quem clonar (Windows, WSL, Linux, Mac).
+* text=auto eol=lf
+
+# Binários: nunca converter
+*.jar binary
+*.class binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
