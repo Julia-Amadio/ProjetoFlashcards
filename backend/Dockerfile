@@ -1,6 +1,6 @@
 # --- STAGE 1: build ---
 # Imagem com Maven + JDK 21 só pra compilar. NÃO VAI PRO ARTEFATO FINAL.
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM docker.io/library/maven:3.9-eclipse-temurin-21 AS build
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN mvn clean package -DskipTests -B
 
 # --- STAGE 2: runtime ---
 # Imagem final enxuta: só JRE (não precisa do JDK completo nem do Maven pra rodar)
-FROM eclipse-temurin:21-jre-alpine
+FROM docker.io/library/eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
