@@ -14,7 +14,5 @@ services:
     build: ./python-services
     container_name: python-services-flashcards
     restart: unless-stopped
-    env_file:
-      - ./python-services/.env
     ports:
       - "8000:8000"

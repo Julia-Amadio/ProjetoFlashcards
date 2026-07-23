@@ -9,9 +9,9 @@ de documentação auxiliar para todos os desenvolvedores do grupo.
 ProjetoFlashcards/
 ├── docs/
 │   ├── ARCHITECTURE.md       # este arquivo
-│   └── API_CHEATSHEET.md     # exemplos de requisição (cURL + Postman) para as rotas já existentes
-├── docker-compose.yml           # orquestra backend + python-services (usado em produção)
-├── docker-compose.override.yml  # mesclado automaticamente por cima do normal em ambiente local/dev
+│   ├── API_CHEATSHEET.md     # exemplos de requisição (cURL + Postman) para as rotas já existentes
+│   └── TODO.md               # checklist do que falta implementar, por módulo
+├── docker-compose.yml           # orquestra backend + python-services, único cenário de execução
 ├── backend/
 │   ├── src.main.java.com.projflashcards.backend/    # backend do projeto construído com Spring Boot
 │   ├── resources/
@@ -41,36 +41,33 @@ Essa separação garante que, caso as APIs externas (OpenAI/Pexels) fiquem indis
 o sistema principal continua no ar, permitindo que os estudantes continuem revisando os 
 flashcards já existentes.
 
-### 1.1 `docker-compose.yml` vs `docker-compose.override.yml`
-O projeto é orquestrado por dois arquivos Compose na raiz, cada um pensado para um cenário
-diferente:
+### 1.1 Um único cenário de execução: sempre contra o Neon
+Existia antes um segundo arquivo, `docker-compose.override.yml`, que subia um PostgreSQL local
+descartável pra uso em dev/homologação, mesclado automaticamente por cima do `docker-compose.yml`
+sempre que alguém rodava `docker compose up` sem `-f`. Essa abordagem foi **abandonada** — hoje só
+existe o `docker-compose.yml`, e ele sempre aponta pro banco na nuvem (Neon), tanto em
+desenvolvimento quanto em produção.
 
-* **`docker-compose.yml` (normal):** o arquivo "de produção". Sobe `backend` e `python-services`
-  e **não** sobe nenhum banco de dados — o backend se conecta direto ao PostgreSQL na nuvem
-  (Neon), lendo a `DB_URL`/credenciais do `backend/.env` (arquivo que nunca é commitado, ver
-  `.gitignore`).
-* **`docker-compose.override.yml` (dev/homologação):** sobe adicionalmente um container `db`
-  com PostgreSQL local (porta **5434**, escolhida porque as portas padrão 5432/5433 já estavam
-  ocupadas por outros bancos na máquina) e **sobrescreve** as variáveis de conexão do `backend`
-  para apontar para esse banco local em vez do Neon.
+Motivos da mudança:
+* **Portabilidade quebrada:** a extensão `env_file: [{path: ..., required: false}]` usada para
+  tornar o `.env` do `python-services` opcional é uma sintaxe recente da Compose Spec, que não
+  existe no `docker-compose` legado (v1) nem em ferramentas que emulam Docker via Podman — exatamente
+  o ambiente de um dos desenvolvedores do grupo. Ter dois arquivos Compose (e a lógica de merge
+  implícito entre eles) aumentava a superfície de coisas que podiam quebrar entre máquinas
+  diferentes, sem trazer benefício proporcional.
+* **Simplicidade > isolamento total:** manter um Postgres local só pra "não sujar" um banco
+  compartilhado exigia manter dois arquivos sincronizados, explicar a mesclagem implícita do
+  Compose pra quem nunca mexeu nisso, e ainda assim intercalar testes manuais contra o Neon de
+  vez em quando pra garantir que os dados realmente vão pro banco certo. Ficou mais simples todo
+  mundo já trabalhar direto contra o mesmo banco.
 
-O comportamento de mesclagem é automático e é assim que o Docker Compose funciona por padrão:
-sempre que você roda `docker compose up` **sem especificar `-f` explicitamente**, o Compose
-procura por um arquivo chamado exatamente `docker-compose.override.yml` na mesma pasta e o
-mescla por cima do `docker-compose.yml`. Ou seja, o comportamento "dev" é o **padrão** ao rodar
-localmente — para rodar no modo "prod" (só o Neon, sem o Postgres local), é necessário informar
-`-f docker-compose.yml` explicitamente, o que faz o Compose ignorar o override por completo.
+> **E se alguém sujar os dados de teste no Neon?** É aceitável. A saída combinada é recriar uma
+> instância nova no Neon e redistribuir as credenciais no grupo — não existe uma instância local
+> pra isolar esse risco, e é um trade-off consciente em troca de simplicidade.
 
-Essa escolha (override implícito) é o que permite que o mesmo `application.properties` funcione
-nos dois cenários sem nenhuma alteração de código — ver a nota sobre o Flyway na seção 2, que
-explica como o Spring Boot decide sozinho, em tempo de execução, se conecta no Neon ou no
-Postgres local, dependendo unicamente da presença do `backend/.env`.
-
-> **Por que às vezes testar contra o Neon mesmo em desenvolvimento?** Ainda que o override seja o
-> padrão para o dia a dia (evita depender de internet/custo do banco na nuvem), rodar
-> explicitamente com `-f docker-compose.yml` de vez em quando é importante para confirmar que os
-> dados estão sendo inseridos corretamente no banco real de produção antes de um deploy — os
-> comandos práticos para os dois cenários estão no `README.md`.
+O `application.properties` continua com um valor de *fallback* pra `localhost:5434` (ver seção 2,
+nota sobre o Flyway) — isso é só um resquício defensivo caso alguém rode o Spring Boot fora do
+Docker sem nenhum `.env`; hoje nada no `docker-compose.yml` sobe um banco nessa porta.
 
 ---
 
@@ -358,10 +355,12 @@ ficam registradas aqui como próximos passos quando o projeto se aproximar de um
    pela rede interna do Compose (via nome do serviço, sem precisar de porta publicada), remover
    esse mapeamento em prod fecha o acesso direto de qualquer pessoa de fora, sem quebrar nada
    entre os dois módulos.
-2. **Mover esse mesmo `ports:` para o `docker-compose.override.yml` (dev).** Assim, em ambiente
-   de desenvolvimento continua sendo possível acessar `localhost:8000` livremente (Postman,
-   Swagger UI, testes manuais), mas essa conveniência não vaza para produção — o compose normal
-   simplesmente não teria mais essa porta publicada.
+2. **Decidir como manter a conveniência de testar `localhost:8000` manualmente (Postman) sem
+   reabrir a porta em produção.** Como hoje só existe um `docker-compose.yml` (ver seção 1.1),
+   isso não pode mais ser resolvido só com um segundo arquivo de override — a decisão de qual
+   mecanismo usar (um compose específico de deploy, `profiles` do Compose, ou simplesmente uma
+   regra de firewall/security group na infraestrutura de hospedagem) fica em aberto até o projeto
+   se aproximar de um deploy real.
 3. **Adicionar um segredo compartilhado entre Java e Python** (ex: header `X-Internal-Token`,
    validado a partir de uma env var que só os dois módulos conhecem) como camada extra de defesa.
    Mesmo sem a porta exposta, isso protege contra: reexposição acidental da porta no futuro, ou o

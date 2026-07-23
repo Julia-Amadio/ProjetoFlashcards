@@ -37,7 +37,7 @@ npm run build
 
 * **Java 21**
 * **Spring Boot 4.0.5** (Web, Data JPA, Security)
-* **PostgreSQL 15** (via Docker)
+* **PostgreSQL 17** (hospedado na nuvem via Neon)
 * **Flyway** (migrations)
 * **Maven** (build tool)
 * **Springdoc OpenAPI (Swagger)** (documentação)
@@ -86,13 +86,16 @@ npm run build
 
 ## Como Executar - Backend Spring Boot + python-services (Docker Compose)
 
-Backend e serviço de IA sobem **inteiramente via Docker Compose** — não é necessário ter Java,
-Maven ou Python instalados na máquina para rodar o projeto, só o Docker. O build de cada imagem
-(Maven, empacotamento do `.jar`, dependências Python) acontece dentro dos containers.
+Backend e serviço de IA sobem **inteiramente via Docker Compose**, direto contra o banco
+PostgreSQL na nuvem (Neon) — não existe mais um Postgres local via Compose. Não é necessário ter
+Java, Maven ou Python instalados na máquina para rodar o projeto, só o Docker. O build de cada
+imagem (Maven, empacotamento do `.jar`, dependências Python) acontece dentro dos containers.
 
 ### Pré-requisitos
 * [Docker Desktop](https://www.docker.com/products/docker-desktop) (ou Docker Engine + Compose plugin), já rodando na máquina;
-* **Git** para clonar o repositório.
+* **Git** para clonar o repositório;
+* Um arquivo `backend/.env` com as credenciais do banco Neon (peça no grupo — não é commitado,
+  ver `.gitignore`).
 
 ### 1) Clone o repositório
 ```bash
@@ -100,20 +103,13 @@ git clone https://github.com/Julia-Amadio/ProjetoFlashcards.git
 cd ProjetoFlashcards
 ```
 
-### 2) Escolha o cenário: desenvolvimento ou produção
-Existem dois arquivos Compose na raiz do projeto, cada um resolvendo o banco de dados de um jeito
-diferente (detalhamento completo em `docs/ARCHITECTURE.md`, seção 1.1):
-
-| Cenário | Comando | Banco de dados |
-|---|---|---|
-| **Dev/homologação** (padrão) | `docker compose up -d --build` | PostgreSQL local, subido pelo próprio Compose na porta **5434** |
-| **Produção** (ou testar contra o banco real) | `docker compose -f docker-compose.yml up -d --build` | PostgreSQL na nuvem (Neon), via credenciais do `backend/.env` |
-
-O modo dev é o **padrão**: rodando `docker compose up` sem `-f`, o Docker Compose mescla
-automaticamente o `docker-compose.override.yml` por cima do `docker-compose.yml`, subindo um
-banco local descartável — nenhum `.env` é necessário nesse cenário. Já o modo produção precisa do
-`-f docker-compose.yml` explícito (isso ignora o override) **e** de um `backend/.env` com as
-credenciais do Neon; sem esse arquivo, o backend não sabe como conectar no banco de produção.
+### 2) Suba os containers
+```bash
+docker compose up -d --build
+```
+O `application.properties` só sabe conectar no banco se existir um `backend/.env` com `DB_URL`,
+`DB_USERNAME` e `DB_PASSWORD` — sem ele, o backend não sobe (ver detalhamento em
+`docs/ARCHITECTURE.md`, seção 1.1).
 
 Depois de subir, os serviços ficam disponíveis em:
 * Backend (Spring Boot): `http://localhost:8080`
@@ -121,14 +117,15 @@ Depois de subir, os serviços ficam disponíveis em:
   no cabeçalho pra abrir, já que `SecurityConfigurations` ainda não libera essa rota
   explicitamente (cai no `.anyRequest().authenticated()`)
 * Python Services (FastAPI): `http://localhost:8000`
-* PostgreSQL local (só no cenário dev): `localhost:5434`
 
 Exemplos de requisição para testar as rotas já implementadas estão em
 `docs/API_CHEATSHEET.md`.
+
+> ⚠️ Como todo mundo aponta pro mesmo banco Neon, tome cuidado com dados de teste alheios. Se
+> alguém sujar o banco de um jeito difícil de reverter, a saída combinada é recriar uma instância
+> nova no Neon e redistribuir as credenciais — não tem instância local pra isolar esse risco.
 
 ### 3) Encerrando a aplicação
 ```bash
 docker compose down
 ```
-Use a mesma flag (`-f docker-compose.yml`) que você usou para subir, caso queira ter certeza de
-que está derrubando exatamente o conjunto de containers esperado.
