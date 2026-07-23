@@ -16,10 +16,19 @@ export type Deck = {
   id: number
   title: string
   language: string
+  speechLanguage: string
   difficultyLevel: string
   description: string
   cardCount: number
   progress: number
   accent: string
   symbol: string
+}
+
+export type Flashcard = {
+  word: string
+  phonetic: string
+  translation: string
+  sentence: string
+  sentenceTranslation: string
 }

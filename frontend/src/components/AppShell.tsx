@@ -11,9 +11,9 @@ export function AppShell({ children, page, navigate }: Props) {
   const name = session?.user?.name || session?.email.split('@')[0] || 'Estudante'
   const initial = name.charAt(0).toUpperCase()
   const links = [
-    { id: 'home', label: 'Visão geral', icon: Compass },
-    { id: 'study', label: 'Estudar agora', icon: BookOpen },
-    { id: 'favorites', label: 'Favoritos', icon: Heart },
+    { id: 'home', path: '/', label: 'Visão geral', icon: Compass },
+    { id: 'study', path: '/study/1', label: 'Estudar agora', icon: BookOpen },
+    { id: 'favorites', path: '/favorites', label: 'Favoritos', icon: Heart },
   ]
 
   const go = (path: string) => { navigate(path); setOpen(false) }
@@ -23,8 +23,8 @@ export function AppShell({ children, page, navigate }: Props) {
       <aside className={`sidebar ${open ? 'sidebar--open' : ''}`}>
         <div className="sidebar-head"><Logo /><button className="icon-button mobile-only" onClick={() => setOpen(false)} aria-label="Fechar menu"><X /></button></div>
         <nav className="main-nav" aria-label="Navegação principal">
-          {links.map(({ id, label, icon: Icon }) => (
-            <button key={id} className={page === id ? 'active' : ''} onClick={() => go(id === 'home' ? '/' : `/${id}`)}>
+          {links.map(({ id, path, label, icon: Icon }) => (
+            <button key={id} className={page === id ? 'active' : ''} onClick={() => go(path)}>
               <Icon size={19} />{label}
             </button>
           ))}

@@ -15,7 +15,8 @@ export default function App() {
 
   if (!session) return <AuthPage mode={route === '/register' ? 'register' : 'login'} navigate={navigate} />
   const authenticatedRoute = route === '/login' || route === '/register' ? '/' : route
-  if (authenticatedRoute === '/study') return <StudyPage navigate={navigate} />
+  const studyMatch = authenticatedRoute.match(/^\/study\/(\d+)\/?$/)
+  if (studyMatch) return <StudyPage deckId={Number(studyMatch[1])} navigate={navigate} />
   const page = authenticatedRoute === '/favorites' ? 'favorites' : 'home'
   return <AppShell page={page} navigate={navigate}><Dashboard navigate={navigate} favoritesOnly={page === 'favorites'} /></AppShell>
 }

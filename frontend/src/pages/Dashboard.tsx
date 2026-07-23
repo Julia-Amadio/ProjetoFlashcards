@@ -37,7 +37,7 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
   return <div className="page-wrap">
     <section className="welcome-row">
       <div><span className="eyebrow">{currentDate}</span><h1>{favoritesOnly ? 'Seus favoritos' : <>Olá, {name}. <em>Vamos aprender?</em></>}</h1><p>{favoritesOnly ? 'Os decks que você guardou para encontrar mais rápido.' : 'Seu próximo pequeno avanço começa agora.'}</p></div>
-      {!favoritesOnly && <button className="primary-button compact" onClick={() => navigate('/study')}><BookOpen size={18} /> Continuar estudando</button>}
+      {!favoritesOnly && <button className="primary-button compact" onClick={() => navigate('/study/1')}><BookOpen size={18} /> Continuar estudando</button>}
     </section>
     {!favoritesOnly && <section className="stats-grid">
       <article><span className="stat-icon coral"><Flame /></span><div><b>4</b><span>dias de sequência</span></div><small>Seu recorde: 7</small></article>
@@ -49,7 +49,7 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
       <div className="deck-grid">
         {filtered.map(deck => <article className="deck-card" key={deck.id}>
           <div className="deck-visual" style={{ background: deck.accent }}><span>{deck.symbol}</span><button className={favorites.includes(deck.id) ? 'favorited' : ''} onClick={() => toggleFavorite(deck.id)} aria-label={favorites.includes(deck.id) ? `Remover ${deck.title} dos favoritos` : `Adicionar ${deck.title} aos favoritos`} aria-pressed={favorites.includes(deck.id)}><Heart /></button></div>
-          <div className="deck-body"><div className="deck-meta"><span>{deck.language}</span><i />{deck.difficultyLevel}</div><h3>{deck.title}</h3><p>{deck.description}</p><div className="progress-label"><span>{deck.cardCount} cards</span><b>{deck.progress}%</b></div><div className="progress-track"><i style={{ width: `${deck.progress}%`, background: deck.accent }} /></div><button className="text-button" onClick={() => navigate('/study')}>{deck.progress ? 'Continuar deck' : 'Começar deck'} <ArrowRight /></button></div>
+          <div className="deck-body"><div className="deck-meta"><span>{deck.language}</span><i />{deck.difficultyLevel}</div><h3>{deck.title}</h3><p>{deck.description}</p><div className="progress-label"><span>{deck.cardCount} cards</span><b>{deck.progress}%</b></div><div className="progress-track"><i style={{ width: `${deck.progress}%`, background: deck.accent }} /></div><button className="text-button" onClick={() => navigate(`/study/${deck.id}`)}>{deck.progress ? 'Continuar deck' : 'Começar deck'} <ArrowRight /></button></div>
         </article>)}
       </div>
       {!filtered.length && <div className="empty-state"><Heart /><h3>Nenhum deck por aqui ainda</h3><p>Tente outra busca ou favorite um deck na biblioteca.</p></div>}
