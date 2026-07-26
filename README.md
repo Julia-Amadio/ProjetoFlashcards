@@ -142,6 +142,7 @@ busca por título/idioma e filtro por dificuldade.
 
 ## Documentação auxiliar
 
-* `docs/ARCHITECTURE.md`: arquitetura, responsabilidades, persistência e fluxo planejado da IA;
+* `docs/ARCHITECTURE.md`: arquitetura, responsabilidades, persistência e integração técnica do
+  serviço de geração;
 * `docs/API_CHEATSHEET.md`: cURL/Postman de todas as rotas HTTP já implementadas;
 * `docs/TODO.md`: pendências reais, separadas por módulo.

@@ -348,7 +348,7 @@ graph TD
 
 ---
 
-## 7. Fluxo de geração de flashcards via IA: quem converte o quê
+## 7. Integração do serviço de IA para geração de flashcards
 
 Uma dúvida recorrente ao desenhar a comunicação Java ↔ Python: já que os dois módulos
 **poderiam** transformar o JSON cru devolvido pelo LLM no formato final, qual dos dois deve
