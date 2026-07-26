@@ -40,6 +40,7 @@ public class SecurityConfigurations {
 					.requestMatchers(HttpMethod.GET, "/users").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.DELETE, "/users/**").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.POST, "/decks/generate").hasAuthority("ROLE_ADMIN")
+					.requestMatchers(HttpMethod.POST, "/decks").hasAuthority("ROLE_ADMIN")
 
 					//Qualquer outra requisição precisará de um token JWT válido
 					.anyRequest().authenticated()
