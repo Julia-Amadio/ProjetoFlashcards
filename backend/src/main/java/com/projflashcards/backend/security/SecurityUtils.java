@@ -1,14 +1,29 @@
 package com.projflashcards.backend.security;
 
+import com.projflashcards.backend.model.User;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import java.util.UUID;
 
-@Component //Transforma a classe em ferramenta injetável do Spring
+@Component
 public class SecurityUtils {
 
-    //Método já tínhamos, intacto
+    public User getAuthenticatedUser() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Usuário não autenticado.");
+        }
+        if (!(authentication.getPrincipal() instanceof UserDetailsImpl userDetails)) {
+            throw new AccessDeniedException("Credenciais inválidas.");
+        }
+        var user = userDetails.getUser();
+        if (user == null) {
+            throw new AccessDeniedException("Detalhes do usuário não encontrados.");
+        }
+        return user;
+    }
+
     public void validatePermissions(UUID targetID) {
         //Pega a autenticação atual do contexto do Spring Security
         var authentication = SecurityContextHolder.getContext().getAuthentication();
