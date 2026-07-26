@@ -1,7 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { api } from '../lib/api'
+import { api, SESSION_UNAUTHORIZED_EVENT } from '../lib/api'
 import { isTokenExpired, tokenExpiration } from '../lib/jwt'
+import { readStorage, removeStorage, writeStorage } from '../lib/storage'
 import type { Session } from '../types'
 
 const STORAGE_KEY = 'karta.session'
@@ -18,18 +19,18 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 function loadAuthState(): { session: Session | null; expired: boolean } {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') as Session | null
+    const saved = JSON.parse(readStorage(STORAGE_KEY) || 'null') as Session | null
     if (!saved?.token || !saved.email) {
-      localStorage.removeItem(STORAGE_KEY)
+      removeStorage(STORAGE_KEY)
       return { session: null, expired: false }
     }
     if (isTokenExpired(saved.token)) {
-      localStorage.removeItem(STORAGE_KEY)
+      removeStorage(STORAGE_KEY)
       return { session: null, expired: true }
     }
     return { session: saved, expired: false }
   } catch {
-    localStorage.removeItem(STORAGE_KEY)
+    removeStorage(STORAGE_KEY)
     return { session: null, expired: false }
   }
 }
@@ -41,8 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const persist = (next: Session | null) => {
     setSession(next)
-    if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    else localStorage.removeItem(STORAGE_KEY)
+    if (next) writeStorage(STORAGE_KEY, JSON.stringify(next))
+    else removeStorage(STORAGE_KEY)
   }
 
   const value: AuthContextValue = {
@@ -78,6 +79,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, Math.max(expiration - Date.now(), 0))
     return () => window.clearTimeout(timeout)
   }, [session])
+
+  useEffect(() => {
+    const invalidateSession = () => {
+      setSessionExpired(true)
+      persist(null)
+    }
+    window.addEventListener(SESSION_UNAUTHORIZED_EVENT, invalidateSession)
+    return () => window.removeEventListener(SESSION_UNAUTHORIZED_EVENT, invalidateSession)
+  }, [])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
