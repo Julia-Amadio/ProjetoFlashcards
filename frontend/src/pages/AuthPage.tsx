@@ -4,12 +4,11 @@ import { useAuth } from '../context/AuthContext'
 import { Logo } from '../components/Logo'
 
 export function AuthPage({ mode, navigate }: { mode: 'login' | 'register'; navigate: (path: string) => void }) {
-  const { login, register, sessionExpired } = useAuth()
+  const { login, register } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const isLogin = mode === 'login'
-  const displayedError = error || (sessionExpired && isLogin ? 'Sua sessão expirou. Entre novamente para continuar.' : '')
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -50,7 +49,7 @@ export function AuthPage({ mode, navigate }: { mode: 'login' | 'register'; navig
             <label>E-mail<input name="email" type="email" autoComplete="email" placeholder="voce@exemplo.com" required /></label>
             <label>Senha<div className="password-field"><input name="password" type={showPassword ? 'text' : 'password'} autoComplete={isLogin ? 'current-password' : 'new-password'} minLength={8} pattern={isLogin ? undefined : '(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).*'} title={isLogin ? undefined : 'Use ao menos uma letra maiúscula, uma minúscula e um número.'} placeholder="mínimo de 8 caracteres" required /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff /> : <Eye />}</button></div></label>
             {!isLogin && <p className="password-hint">Use maiúscula, minúscula e pelo menos um número.</p>}
-            {displayedError && <div className="form-error" role="alert">{displayedError}</div>}
+            {error && <div className="form-error" role="alert">{error}</div>}
             <button className="primary-button" disabled={loading}>{loading ? 'Só um instante…' : isLogin ? 'Entrar' : 'Criar conta'}<ArrowRight size={18} /></button>
           </form>
           <p className="auth-switch">{isLogin ? 'Ainda não tem uma conta?' : 'Já tem uma conta?'} <button onClick={() => navigate(isLogin ? '/register' : '/login')}>{isLogin ? 'Criar agora' : 'Entrar'}</button></p>

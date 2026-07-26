@@ -7,11 +7,21 @@ correria — pode virar cards num Trello (ou equivalente) quando o grupo organiz
 
 ## Backend (Java / Spring Boot)
 
+- [ ] Endpoint de criação/listagem de `decks` (`POST`/`GET /decks`). Hoje não existe nenhum —
+  as rotas de favoritos já implementadas dependem de um deck já existir manualmente no banco.
 - [ ] CRUD de `flashcards` (criar, editar, remover) restrito a `ROLE_ADMIN`, conforme o escopo do
   projeto (README, seção "Permissões e roles").
-- [ ] Endpoint que dispara a geração via IA (`POST /decks/generate`), incluindo o DTO de
+- [ ] Endpoint que dispara a geração via IA (ex: `POST /decks/generate`), incluindo o DTO de
   validação da resposta do `python-services` antes de persistir — ver `ARCHITECTURE.md`, seção 6.
-  (A regra de segurança `.hasAuthority("ROLE_ADMIN")` já está no `SecurityConfigurations`.)
+- [ ] Regra explícita no `SecurityConfigurations` pra essa rota nova
+  (`.requestMatchers(HttpMethod.POST, "/decks/generate").hasAuthority("ROLE_ADMIN")`) — só faz
+  sentido depois do endpoint acima existir.
+- [ ] Decidir se o Swagger UI/OpenAPI deve ficar acessível sem token em dev (hoje cai no
+  `.anyRequest().authenticated()` e retorna `403` pra qualquer um, inclusive em `/docs`).
+- [ ] Definir `PYTHON_SERVICE_URL` no `docker-compose.yml` de produção (hoje só existe no
+  `.override.yml` de dev) — necessário quando o backend de fato chamar o `python-services`.
+- [ ] TODO já anotado no código: `AuthenticationController.login` retorna o token como `String`
+  puro; trocar por um `TokenResponseDTO` pra vir em JSON.
 
 ## python-services (Python / FastAPI)
 
@@ -31,13 +41,3 @@ correria — pode virar cards num Trello (ou equivalente) quando o grupo organiz
 
 - [ ] Reavaliar a exposição pública da porta `8000` do `python-services` antes de qualquer deploy
   real (já documentado como mudança futura na seção 6 do `ARCHITECTURE.md`, não aplicado ainda).
-
----
-
-## ✅ Já concluídas
-
-- Variáveis de Ambiente e Infraestrutura no Docker Compose (db, JWT, portas, PYTHON_SERVICE_URL)
-- Regras de Segurança no SecurityConfigurations (admin-only para GET /users, DELETE /users/**, POST /decks, POST /decks/generate)
-- Endpoint de criação/listagem de decks (`POST`/`GET /decks`, `GET /decks/{id}`)
-- Swagger UI/OpenAPI liberado sem token em dev
-- `AuthenticationController.login` retorna token em JSON (`LoginResponseDTO`)
