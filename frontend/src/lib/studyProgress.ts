@@ -1,3 +1,5 @@
+import { readStorage, writeStorage } from './storage'
+
 export type StudyResults = {
   again: number
   almost: number
@@ -21,7 +23,7 @@ function storageKey(email: string, deckId: number) {
 export function loadStudyProgress(email: string, deckId: number, cardCount: number): StudyProgress {
   const fallback: StudyProgress = { index: 0, revealed: false, completed: false, results: emptyResults, updatedAt: '' }
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey(email, deckId)) || 'null') as Partial<StudyProgress> | null
+    const saved = JSON.parse(readStorage(storageKey(email, deckId)) || 'null') as Partial<StudyProgress> | null
     if (!saved) return fallback
     return {
       index: Math.min(Math.max(Number(saved.index) || 0, 0), cardCount - 1),
@@ -40,7 +42,7 @@ export function loadStudyProgress(email: string, deckId: number, cardCount: numb
 }
 
 export function saveStudyProgress(email: string, deckId: number, progress: Omit<StudyProgress, 'updatedAt'>) {
-  localStorage.setItem(storageKey(email, deckId), JSON.stringify({ ...progress, updatedAt: new Date().toISOString() }))
+  return writeStorage(storageKey(email, deckId), JSON.stringify({ ...progress, updatedAt: new Date().toISOString() }))
 }
 
 export function progressPercentage(progress: StudyProgress, cardCount: number) {

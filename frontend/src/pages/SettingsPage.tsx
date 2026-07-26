@@ -8,15 +8,18 @@ export function SettingsPage({ navigate }: { navigate: (path: string) => void })
   const email = session?.email ?? 'guest'
   const [preferences, setPreferences] = useState<StudyPreferences>(() => loadPreferences(email))
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState(false)
 
   function update<K extends keyof StudyPreferences>(key: K, value: StudyPreferences[K]) {
     setPreferences(current => ({ ...current, [key]: value }))
     setSaved(false)
+    setSaveError(false)
   }
 
   function submit() {
-    savePreferences(email, preferences)
-    setSaved(true)
+    const didSave = savePreferences(email, preferences)
+    setSaved(didSave)
+    setSaveError(!didSave)
   }
 
   return <div className="page-wrap settings-page">
@@ -46,6 +49,7 @@ export function SettingsPage({ navigate }: { navigate: (path: string) => void })
       </div>
       <div className="settings-actions">
         {saved && <span className="save-confirmation" role="status"><Check /> Preferências salvas</span>}
+        {saveError && <span className="save-error" role="alert">Não foi possível salvar neste dispositivo.</span>}
         <button className="primary-button compact" onClick={submit}>Salvar alterações</button>
       </div>
     </section>
