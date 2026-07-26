@@ -7,11 +7,7 @@ correria — pode virar cards num Trello (ou equivalente) quando o grupo organiz
 
 ## Backend (Java / Spring Boot)
 
-- [ ] CRUD de `flashcards` (criar, editar, remover) restrito a `ROLE_ADMIN`, conforme o escopo do
-  projeto (README, seção "Permissões e roles").
-- [ ] Endpoint que dispara a geração via IA (`POST /decks/generate`), incluindo o DTO de
-  validação da resposta do `python-services` antes de persistir — ver `ARCHITECTURE.md`, seção 6.
-  (A regra de segurança `.hasAuthority("ROLE_ADMIN")` já está no `SecurityConfigurations`.)
+_Nenhuma task pendente no backend._
 
 ## python-services (Python / FastAPI)
 
@@ -41,3 +37,5 @@ correria — pode virar cards num Trello (ou equivalente) quando o grupo organiz
 - Endpoint de criação/listagem de decks (`POST`/`GET /decks`, `GET /decks/{id}`)
 - Swagger UI/OpenAPI liberado sem token em dev
 - `AuthenticationController.login` retorna token em JSON (`LoginResponseDTO`)
+- Endpoint de geração via IA (`POST /decks/generate`) com integração Java ↔ Python (Pydantic + RestTemplate + persistência)
+- CRUD de `flashcards` (criar, listar, editar, remover) restrito a `ROLE_ADMIN`
