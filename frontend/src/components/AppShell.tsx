@@ -39,7 +39,7 @@ export function AppShell({ children, page, navigate }: Props) {
       <main className="main-content">
         <header className="topbar">
           <button className="icon-button mobile-only" onClick={() => setOpen(true)} aria-label="Abrir menu"><Menu /></button>
-          <div className="topbar-actions"><button className="streak">🔥 <span>4 dias</span></button><div className="avatar">{initial}</div></div>
+          <div className="topbar-actions"><button className="avatar" onClick={() => go('/settings')} aria-label={`Abrir configurações de ${name}`}>{initial}</button></div>
         </header>
         {children}
       </main>
