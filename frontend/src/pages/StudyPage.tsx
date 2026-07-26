@@ -1,5 +1,6 @@
 import { ArrowLeft, CheckCircle2, RotateCcw, Volume2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { PageState } from '../components/PageState'
 import { useAuth } from '../context/AuthContext'
 import { sampleCardsByDeck, sampleDecks } from '../data/decks'
 import { loadPreferences } from '../lib/preferences'
@@ -16,12 +17,7 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
 
   if (!deck || !cards?.length) {
     return <main className="study-page study-not-found">
-      <section className="study-complete">
-        <span className="eyebrow">DECK NÃO ENCONTRADO</span>
-        <h1>Este estudo não está disponível.</h1>
-        <p>Volte à biblioteca para escolher um dos decks disponíveis.</p>
-        <button className="primary-button" onClick={() => navigate('/')}><ArrowLeft /> Voltar à biblioteca</button>
-      </section>
+      <PageState kind="error" title="Este estudo não está disponível" description="Volte à biblioteca para escolher um dos decks disponíveis." action={<button className="primary-button" onClick={() => navigate('/')}><ArrowLeft /> Voltar à biblioteca</button>} />
     </main>
   }
 

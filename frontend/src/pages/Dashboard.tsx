@@ -1,5 +1,6 @@
 import { ArrowRight, BookOpen, Clock3, Flame, Heart, Search } from 'lucide-react'
 import { useState } from 'react'
+import { PageState } from '../components/PageState'
 import { useAuth } from '../context/AuthContext'
 import { sampleDecks } from '../data/decks'
 import { sampleCardsByDeck } from '../data/decks'
@@ -62,7 +63,7 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
           <div className="deck-body"><div className="deck-meta"><span>{deck.language}</span><i />{deck.difficultyLevel}</div><h3>{deck.title}</h3><p>{deck.description}</p><div className="progress-label"><span>{deck.cardCount} cards</span><b>{deckProgress[deck.id]}%</b></div><div className="progress-track"><i style={{ width: `${deckProgress[deck.id]}%`, background: deck.accent }} /></div><button className="text-button" onClick={() => navigate(`/study/${deck.id}`)}>{deckProgress[deck.id] ? 'Continuar deck' : 'Começar deck'} <ArrowRight /></button></div>
         </article>)}
       </div>
-      {!filtered.length && <div className="empty-state"><Heart /><h3>Nenhum deck por aqui ainda</h3><p>Tente outra busca ou favorite um deck na biblioteca.</p></div>}
+      {!filtered.length && <PageState kind="empty" icon={Heart} title="Nenhum deck por aqui ainda" description="Tente outra busca ou favorite um deck na biblioteca." />}
       {!favoritesOnly && <div className="demo-note">Conteúdo de demonstração enquanto a API de decks é construída.</div>}
     </section>
   </div>

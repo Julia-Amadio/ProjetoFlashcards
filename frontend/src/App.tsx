@@ -3,6 +3,7 @@ import { AppShell } from './components/AppShell'
 import { useAuth } from './context/AuthContext'
 import { AuthPage } from './pages/AuthPage'
 import { Dashboard } from './pages/Dashboard'
+import { NotFoundPage } from './pages/NotFoundPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StudyPage } from './pages/StudyPage'
 
@@ -18,8 +19,13 @@ export default function App() {
   const authenticatedRoute = route === '/login' || route === '/register' ? '/' : route
   const studyMatch = authenticatedRoute.match(/^\/study\/(\d+)\/?$/)
   if (studyMatch) return <StudyPage deckId={Number(studyMatch[1])} navigate={navigate} />
-  const page = authenticatedRoute === '/favorites' ? 'favorites' : authenticatedRoute === '/settings' ? 'settings' : 'home'
+  const knownPages = ['/', '/favorites', '/settings']
+  const page = authenticatedRoute === '/favorites' ? 'favorites' : authenticatedRoute === '/settings' ? 'settings' : authenticatedRoute === '/' ? 'home' : 'not-found'
   return <AppShell page={page} navigate={navigate}>
-    {page === 'settings' ? <SettingsPage navigate={navigate} /> : <Dashboard navigate={navigate} favoritesOnly={page === 'favorites'} />}
+    {!knownPages.includes(authenticatedRoute)
+      ? <NotFoundPage navigate={navigate} />
+      : page === 'settings'
+        ? <SettingsPage navigate={navigate} />
+        : <Dashboard navigate={navigate} favoritesOnly={page === 'favorites'} />}
   </AppShell>
 }
