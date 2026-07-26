@@ -29,16 +29,14 @@ public class SecurityConfigurations {
             //Muda a gestão de sessão para STATELESS (o padrão do Spring é criar sessão, mas com JWT não usamos isso)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authorize -> authorize
-					//IMPORTANTE: usar .hasAuthority() ao invés de .hasRole().
-
-					//IMPORTANTE: liberar a rota de login, senão ninguém consegue gerar o token.
+					//Rotas públicas — não exigem token
 					.requestMatchers(HttpMethod.POST, "/login").permitAll()
-
-					//Libera o cadastro de usuários
 					.requestMatchers(HttpMethod.POST, "/users").permitAll()
 
-					//Protege rota de listagem de usuários para apenas ADMINs
+					//Rotas administrativas — apenas usuários com ROLE_ADMIN
 					.requestMatchers(HttpMethod.GET, "/users").hasAuthority("ROLE_ADMIN")
+					.requestMatchers(HttpMethod.DELETE, "/users/**").hasAuthority("ROLE_ADMIN")
+					.requestMatchers(HttpMethod.POST, "/decks/generate").hasAuthority("ROLE_ADMIN")
 
 					//Qualquer outra requisição precisará de um token JWT válido
 					.anyRequest().authenticated()
