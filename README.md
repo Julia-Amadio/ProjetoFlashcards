@@ -109,7 +109,7 @@ docker compose up -d --build
 ```
 O `application.properties` só sabe conectar no banco se existir um `backend/.env` com `DB_URL`,
 `DB_USERNAME` e `DB_PASSWORD` — sem ele, o backend não sobe (ver detalhamento em
-`docs/ARCHITECTURE.md`, seção 1.1).
+`docs/ARCHITECTURE.md`, seção 1).
 
 Depois de subir, os serviços ficam disponíveis em:
 * Backend (Spring Boot): `http://localhost:8080`

@@ -41,33 +41,18 @@ Essa separação garante que, caso as APIs externas (OpenAI/Pexels) fiquem indis
 o sistema principal continua no ar, permitindo que os estudantes continuem revisando os 
 flashcards já existentes.
 
-### 1.1 Um único cenário de execução: sempre contra o Neon
-Existia antes um segundo arquivo, `docker-compose.override.yml`, que subia um PostgreSQL local
-descartável pra uso em dev/homologação, mesclado automaticamente por cima do `docker-compose.yml`
-sempre que alguém rodava `docker compose up` sem `-f`. Essa abordagem foi **abandonada** — hoje só
-existe o `docker-compose.yml`, e ele sempre aponta pro banco na nuvem (Neon), tanto em
-desenvolvimento quanto em produção.
+### Execução: um único cenário, sempre contra o Neon
+Todo o sistema sobe por um único `docker-compose.yml`, apontando sempre pro banco na nuvem (Neon) —
+tanto em desenvolvimento quanto em produção. **Não existe Postgres local em lugar nenhum** do projeto:
+o `application.properties` também não tem fallback de banco; sem as variáveis do Neon (`DB_URL`,
+`DB_USERNAME`, `DB_PASSWORD`), a aplicação simplesmente não sobe.
 
-Motivos da mudança:
-* **Portabilidade quebrada:** a extensão `env_file: [{path: ..., required: false}]` usada para
-  tornar o `.env` do `python-services` opcional é uma sintaxe recente da Compose Spec, que não
-  existe no `docker-compose` legado (v1) nem em ferramentas que emulam Docker via Podman — exatamente
-  o ambiente de um dos desenvolvedores do grupo. Ter dois arquivos Compose (e a lógica de merge
-  implícito entre eles) aumentava a superfície de coisas que podiam quebrar entre máquinas
-  diferentes, sem trazer benefício proporcional.
-* **Simplicidade > isolamento total:** manter um Postgres local só pra "não sujar" um banco
-  compartilhado exigia manter dois arquivos sincronizados, explicar a mesclagem implícita do
-  Compose pra quem nunca mexeu nisso, e ainda assim intercalar testes manuais contra o Neon de
-  vez em quando pra garantir que os dados realmente vão pro banco certo. Ficou mais simples todo
-  mundo já trabalhar direto contra o mesmo banco.
-
-> **E se alguém sujar os dados de teste no Neon?** É aceitável. A saída combinada é recriar uma
-> instância nova no Neon e redistribuir as credenciais no grupo — não existe uma instância local
-> pra isolar esse risco, e é um trade-off consciente em troca de simplicidade.
-
-O `application.properties` continua com um valor de *fallback* pra `localhost:5434` (ver seção 2,
-nota sobre o Flyway) — isso é só um resquício defensivo caso alguém rode o Spring Boot fora do
-Docker sem nenhum `.env`; hoje nada no `docker-compose.yml` sobe um banco nessa porta.
+> Já existiu um `docker-compose.override.yml` que subia um Postgres local descartável, mesclado
+> automaticamente por cima do compose principal. Foi removido de propósito: teve gente do grupo com
+> drift de versão no Podman — a sintaxe recente da Compose Spec usada no override (`env_file` com
+> `required: false`) não rodava nesse ambiente — e um banco centralizado no Neon acabou sendo mais
+> simples de manter do que dois arquivos Compose sincronizados. Se alguém sujar os dados de teste, a
+> saída combinada é recriar a instância no Neon e redistribuir as credenciais no grupo.
 
 ---
 
@@ -356,7 +341,7 @@ ficam registradas aqui como próximos passos quando o projeto se aproximar de um
    esse mapeamento em prod fecha o acesso direto de qualquer pessoa de fora, sem quebrar nada
    entre os dois módulos.
 2. **Decidir como manter a conveniência de testar `localhost:8000` manualmente (Postman) sem
-   reabrir a porta em produção.** Como hoje só existe um `docker-compose.yml` (ver seção 1.1),
+   reabrir a porta em produção.** Como hoje só existe um `docker-compose.yml` (ver seção 1),
    isso não pode mais ser resolvido só com um segundo arquivo de override — a decisão de qual
    mecanismo usar (um compose específico de deploy, `profiles` do Compose, ou simplesmente uma
    regra de firewall/security group na infraestrutura de hospedagem) fica em aberto até o projeto
