@@ -33,6 +33,9 @@ public class SecurityConfigurations {
 					.requestMatchers(HttpMethod.POST, "/login").permitAll()
 					.requestMatchers(HttpMethod.POST, "/users").permitAll()
 
+					//Swagger/OpenAPI — acessível sem token em dev
+					.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+
 					//Rotas administrativas — apenas usuários com ROLE_ADMIN
 					.requestMatchers(HttpMethod.GET, "/users").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.DELETE, "/users/**").hasAuthority("ROLE_ADMIN")
