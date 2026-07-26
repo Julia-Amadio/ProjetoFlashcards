@@ -11,24 +11,31 @@ ProjetoFlashcards/
 │   ├── ARCHITECTURE.md       # este arquivo
 │   ├── API_CHEATSHEET.md     # exemplos de requisição (cURL + Postman) para as rotas já existentes
 │   └── TODO.md               # checklist do que falta implementar, por módulo
-├── docker-compose.yml           # orquestra backend + python-services, único cenário de execução
+├── docker-compose.yml         # orquestra PostgreSQL + backend + python-services
 ├── backend/
-│   ├── src.main.java.com.projflashcards.backend/    # backend do projeto construído com Spring Boot
-│   ├── resources/
-│   │   ├── db.migration/             # migrações Flyway
-│   │   └── application.properties    # configurações do Spring Boot (conexão BD, comportamentos, etc.)
+│   ├── src/main/java/com/projflashcards/backend/    # backend construído com Spring Boot
+│   ├── src/main/resources/
+│   │   ├── db/migration/             # migrações Flyway
+│   │   └── application.properties    # conexão com BD, JWT, JPA e Swagger
 │   ├── Dockerfile            # build multi-stage do backend (Maven -> JRE)
 │   └── pom.xml               # dependências do backend, gerenciadas pelo Maven
-├── frontend/
-└── python-services/          # serviço de IA para geração de flashcards
-    └── Dockerfile             # build multi-stage do serviço Python (builder -> runtime)
+├── frontend/                 # React + TypeScript + Vite
+│   └── src/
+│       ├── data/             # decks/cartões demonstrativos usados na revisão
+│       ├── lib/              # API, JWT e persistência local
+│       └── pages/            # autenticação, dashboard, estudo e configurações
+└── python-services/
+    ├── main.py               # stub FastAPI usado pelo container
+    ├── test.py               # pipeline manual de geração (ainda fora da API)
+    ├── modulos/              # LLM, imagem, áudio, idiomas e exportação APKG
+    └── Dockerfile            # build multi-stage do serviço Python (builder -> runtime)
 ```
 
 O projeto utiliza uma arquitetura de **Sistema Distribuído**, projetada para separar 
 responsabilidades e otimizar recursos. Ela é dividida em três frentes principais:
 
-- **Frontend (React):** interface do usuário onde o estudante pratica os cards e 
-o administrador gerencia os decks.
+- **Frontend (React):** interface do usuário onde o estudante cria a conta, consulta o catálogo
+de decks e pratica os cartões demonstrativos.
 - **Backend principal (Spring Boot):** o "cérebro" monolítico do negócio. Gerencia 
 de forma centralizada os usuários, segurança (JWT), progresso de aprendizado e persiste 
 os dados no banco PostgreSQL.
@@ -37,37 +44,55 @@ pesado e IA. Ele não guarda estado (*stateless*) e atua apenas sob demanda do S
 para gerar frases (OpenAI), buscar imagens e sintetizar voz, isolando a complexidade 
 dessas bibliotecas do backend principal.
 
-Essa separação garante que, caso as APIs externas (OpenAI/Pexels) fiquem indisponíveis, 
-o sistema principal continua no ar, permitindo que os estudantes continuem revisando os 
-flashcards já existentes.
+Essa separação também evita que uma indisponibilidade da OpenAI/Pexels derrube autenticação,
+catálogo ou favoritos. Hoje essa independência é ainda mais direta: o backend depende do container
+Python estar iniciado, mas nenhuma rota Java implementada chama o serviço de IA.
 
-### 1.1 Um único cenário de execução: sempre contra o Neon
-Existia antes um segundo arquivo, `docker-compose.override.yml`, que subia um PostgreSQL local
-descartável pra uso em dev/homologação, mesclado automaticamente por cima do `docker-compose.yml`
-sempre que alguém rodava `docker compose up` sem `-f`. Essa abordagem foi **abandonada** — hoje só
-existe o `docker-compose.yml`, e ele sempre aponta pro banco na nuvem (Neon), tanto em
-desenvolvimento quanto em produção.
+### 1.1 Banco local por padrão, Neon quando configurado
+O `docker-compose.yml` atual sobe três serviços: `postgres`, `backend` e `python-services`. O
+PostgreSQL local usa a porta `5434` do host (porta `5432` dentro da rede Docker) e persiste os
+dados no volume nomeado `postgres_data`.
 
-Motivos da mudança:
-* **Portabilidade quebrada:** a extensão `env_file: [{path: ..., required: false}]` usada para
-  tornar o `.env` do `python-services` opcional é uma sintaxe recente da Compose Spec, que não
-  existe no `docker-compose` legado (v1) nem em ferramentas que emulam Docker via Podman — exatamente
-  o ambiente de um dos desenvolvedores do grupo. Ter dois arquivos Compose (e a lógica de merge
-  implícito entre eles) aumentava a superfície de coisas que podiam quebrar entre máquinas
-  diferentes, sem trazer benefício proporcional.
-* **Simplicidade > isolamento total:** manter um Postgres local só pra "não sujar" um banco
-  compartilhado exigia manter dois arquivos sincronizados, explicar a mesclagem implícita do
-  Compose pra quem nunca mexeu nisso, e ainda assim intercalar testes manuais contra o Neon de
-  vez em quando pra garantir que os dados realmente vão pro banco certo. Ficou mais simples todo
-  mundo já trabalhar direto contra o mesmo banco.
+O backend recebe as configurações por duas fontes:
+* O Compose exige e lê `backend/.env` através de `env_file`;
+* O bloco `environment` define `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
+  `SPRING_DATASOURCE_PASSWORD`, `API_SECURITY_TOKEN_SECRET` e `PYTHON_SERVICE_URL`, com valores
+  locais de *fallback*.
 
-> **E se alguém sujar os dados de teste no Neon?** É aceitável. A saída combinada é recriar uma
-> instância nova no Neon e redistribuir as credenciais no grupo — não existe uma instância local
-> pra isolar esse risco, e é um trade-off consciente em troca de simplicidade.
+As expressões `${DB_URL:-...}` desse bloco são resolvidas a partir do ambiente do shell ou do
+arquivo `.env` na **raiz** do projeto. Como valores de `environment` têm precedência sobre
+`env_file`, as chaves homônimas guardadas somente em `backend/.env` acabam sobrescritas pelos
+*fallbacks*. Esse detalhe é fácil de confundir: o arquivo `backend/.env` precisa existir, mas
+editar apenas ele não muda a conexão enquanto o Compose estiver estruturado dessa forma.
 
-O `application.properties` continua com um valor de *fallback* pra `localhost:5434` (ver seção 2,
-nota sobre o Flyway) — isso é só um resquício defensivo caso alguém rode o Spring Boot fora do
-Docker sem nenhum `.env`; hoje nada no `docker-compose.yml` sobe um banco nessa porta.
+> **RESUMO DO COMPORTAMENTO ATUAL:** as credenciais do Neon que foram distribuídas aos
+> integrantes dentro de `backend/.env` **não fazem o backend usar o Neon**. Se ninguém exportar
+> as variáveis no shell e não existir um `.env` na raiz, `docker compose up` injeta
+> `SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/flashcards_db`; portanto, quem recebe as
+> consultas é o PostgreSQL local. Nesse cenário, Neon não é o banco principal nem um *fallback*:
+> ele simplesmente não participa da execução.
+
+Com os *fallbacks*, o backend acessa `postgres:5432`, usando o nome do serviço na rede interna:
+```env
+DB_URL=jdbc:postgresql://postgres:5432/flashcards_db
+DB_USERNAME=flashcards_admin
+DB_PASSWORD=password123
+JWT_SECRET=troque-por-uma-chave-longa-e-aleatoria
+```
+
+Se `DB_URL` for definido no shell ou num `.env` da raiz apontando pro Neon, o backend passa a usar
+o banco remoto. O container `postgres` continua subindo porque ele ainda faz parte do
+`depends_on`, mas deixa de receber as consultas da aplicação. Essa possibilidade é útil, porém
+exige cuidado para não confundir dados locais com os compartilhados na nuvem.
+
+> **NOTA:** fora do Docker, o `application.properties` usa
+> `jdbc:postgresql://localhost:5434/flashcards_db` como *fallback*. Dentro do Docker, esse mesmo
+> endereço não funcionaria porque `localhost` apontaria pro próprio container do backend; é por
+> isso que o Compose injeta `postgres:5432`.
+
+O volume sobrevive a `docker compose down`. Para começar o banco local do zero seria necessário
+remover também o volume (`docker compose down -v`), operação destrutiva que apaga todos os dados
+locais.
 
 ---
 
@@ -111,14 +136,54 @@ retornando um erro amigável antes mesmo de tentar salvar no banco.
 ---
 
 ## 3. Stack - Python Services
-- **FastAPI:** framework web que servirá para expor os scripts de IA como endpoints 
-que o Java pode chamar.
-- **OpenAI SDK:** para integração com o GPT-4o-mini.
+- **FastAPI:** framework web que deverá expor os scripts de IA como endpoints que o Java pode
+chamar. No estado atual, `main.py` possui somente `GET /`, usado também pelo healthcheck da imagem.
+- **OpenAI SDK:** integração usada por `llm_agent.py`, atualmente configurada com o modelo
+`gpt-5` e Structured Outputs via Pydantic.
 - **Edge-TTS:** para gerar áudios com vozes neurais realistas sem custo.
+- **Pexels:** busca de imagens por termo em inglês.
+- **Genanki:** geração de pacotes `.apkg` para mandarim, inglês, francês e japonês.
+
+> **Estado atual:** os módulos de LLM, áudio, imagem e APKG existem, mas ainda não são importados
+> pelo `main.py`. O pipeline completo só é orquestrado por `test.py`, executado manualmente, e
+> escreve mídias temporárias/arquivos `.apkg` no disco. Além disso, `gerador_apkg.py` importa
+> `genanki`, mas essa biblioteca ainda não está declarada no `requirements.txt`; portanto, o
+> pipeline de exportação não funciona numa instalação limpa até essa dependência ser adicionada.
 
 ---
 
-## 4. Detalhamento da arquitetura de pacotes
+## 4. Stack - Frontend React
+O frontend é uma SPA sem biblioteca de roteamento. `App.tsx` observa
+`window.location.pathname`, atualiza o histórico com `pushState` e distribui as páginas
+manualmente.
+
+### O que já conversa com o backend
+* `POST /users`: cadastro;
+* `POST /login`: login e obtenção do JWT;
+* `GET /decks`: catálogo exibido no dashboard.
+
+O cliente usa `/api` por padrão. Durante o desenvolvimento, o proxy do Vite remove esse prefixo
+e encaminha a requisição para `http://localhost:8080`. Em outro ambiente,
+`VITE_API_URL` substitui a URL base.
+
+### O que ainda é local/demonstrativo
+* `frontend/src/data/decks.ts` contém os decks e cartões usados pela tela `/study/{id}`;
+* favoritos da interface ficam em `karta.favorites.{email}`;
+* preferências ficam em `karta.preferences.{email}`;
+* progresso de cada deck fica em `karta.study.{email}.{deckId}`;
+* a sessão JWT fica em `karta.session`.
+
+Isso cria uma diferença importante: o dashboard lista qualquer deck existente no PostgreSQL,
+mas a tela de estudo só reconhece os IDs `1`, `2` e `3` definidos nos dados demonstrativos. Os
+endpoints de favoritos do backend existem, porém o frontend ainda não os chama.
+
+O JWT é lido no navegador para verificar a claim `exp`. Ao expirar — ou quando uma chamada
+autenticada devolve `401` — a sessão local é removida e a tela de login informa que é necessário
+entrar novamente.
+
+---
+
+## 5. Detalhamento da arquitetura de pacotes
 A estrutura de pacotes foi desenhada seguindo o padrão de Arquitetura em Camadas,
 visando o desacoplamento e a facilidade de manutenção.
 
@@ -139,6 +204,12 @@ Onde reside a verdade sobre as regras de negócio de cada entidade em particular
       não altere dados de outro;
     * Define as regras do corpo de requisição das rotas presentes no `controller`, garantindo a
       integridade dos dados inseridos/alterados no banco e gerenciando o ciclo de vida da entidade.
+* `DeckService`:
+    * Usa o usuário autenticado como autor ao criar um deck;
+    * Lista/busca decks e os converte para `DeckSummaryDTO`.
+* `UserFavoriteService`:
+    * Valida se o usuário autenticado é dono do recurso ou administrador;
+    * Gerencia a relação muitos-para-muitos persistida em `user_favorite_decks`.
 
 ### 📂 `com.projflashcards.backend.security`
 Este é o pacote "transversal" do sistema. Ele não lida com regras de negócio de flashcards,
@@ -170,7 +241,7 @@ contrato com o Frontend (React), além de evitar a exposição de dados sensíve
 
 ---
 
-## 5. Diagramação auxiliar
+## 6. Diagramação auxiliar
 
 ### Fase 1: o trabalho do Maven (*build* e compilação)
 Antes de executar, o código legível para humanos precisa ser traduzido e empacotado. **O Maven
@@ -277,7 +348,7 @@ graph TD
 
 ---
 
-## 6. Fluxo de geração de flashcards via IA: quem converte o quê
+## 7. Fluxo de geração de flashcards via IA: quem converte o quê
 
 Uma dúvida recorrente ao desenhar a comunicação Java ↔ Python: já que os dois módulos
 **poderiam** transformar o JSON cru devolvido pelo LLM no formato final, qual dos dois deve
