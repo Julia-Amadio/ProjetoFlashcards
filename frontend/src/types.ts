@@ -12,6 +12,13 @@ export type Session = {
   user?: User
 }
 
+export type DeckSummary = {
+  id: number
+  title: string
+  language: string
+  difficultyLevel: string | null
+}
+
 export type Deck = {
   id: number
   title: string

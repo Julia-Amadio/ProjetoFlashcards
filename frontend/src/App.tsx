@@ -14,6 +14,16 @@ export default function App() {
   const [route, setRoute] = useState(routeFromLocation)
   const navigate = (path: string) => { window.history.pushState({}, '', path); setRoute(path); window.scrollTo(0, 0) }
   useEffect(() => { const pop = () => setRoute(routeFromLocation()); window.addEventListener('popstate', pop); return () => window.removeEventListener('popstate', pop) }, [])
+  useEffect(() => {
+    const pageTitles: Record<string, string> = {
+      '/': 'Karta — Visão geral',
+      '/favorites': 'Karta — Favoritos',
+      '/settings': 'Karta — Configurações',
+      '/login': 'Karta — Entrar',
+      '/register': 'Karta — Criar conta',
+    }
+    document.title = route.startsWith('/study/') ? 'Karta — Estudo' : pageTitles[route] ?? 'Karta — Página não encontrada'
+  }, [route])
 
   if (!session) return <AuthPage mode={route === '/register' ? 'register' : 'login'} navigate={navigate} />
   const authenticatedRoute = route === '/login' || route === '/register' ? '/' : route
