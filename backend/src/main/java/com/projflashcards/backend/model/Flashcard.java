@@ -84,6 +84,13 @@ public class Flashcard {
     public String getAudioSentenceUrl() { return audioSentenceUrl; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 
+    public void setTargetWord(String targetWord) { this.targetWord = targetWord; }
+    public void setPhoneticReading(String phoneticReading) { this.phoneticReading = phoneticReading; }
+    public void setNativeTranslation(String nativeTranslation) { this.nativeTranslation = nativeTranslation; }
+    public void setPartOfSpeech(String partOfSpeech) { this.partOfSpeech = partOfSpeech; }
+    public void setTargetSentence(String targetSentence) { this.targetSentence = targetSentence; }
+    public void setSentencePhonetic(String sentencePhonetic) { this.sentencePhonetic = sentencePhonetic; }
+    public void setSentenceTranslation(String sentenceTranslation) { this.sentenceTranslation = sentenceTranslation; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public void setAudioWordUrl(String audioWordUrl) { this.audioWordUrl = audioWordUrl; }
     public void setAudioSentenceUrl(String audioSentenceUrl) { this.audioSentenceUrl = audioSentenceUrl; }
