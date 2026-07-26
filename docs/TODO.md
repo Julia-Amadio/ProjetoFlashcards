@@ -27,6 +27,11 @@ _Nenhuma task pendente no backend._
 
 - [ ] Reavaliar a exposição pública da porta `8000` do `python-services` antes de qualquer deploy
   real (já documentado como mudança futura na seção 6 do `ARCHITECTURE.md`, não aplicado ainda).
+- [ ] Avaliar (no audit de segurança pré-deploy) como as credenciais são expostas via env var: hoje
+  `docker inspect`/`docker compose config` mostram os valores do `backend/.env` em texto puro pra
+  quem tem acesso ao daemon do Docker. Considerar Docker secrets (`/run/secrets/` + `configtree` no
+  Spring) ou deixar a plataforma de hospedagem injetar os segredos. Não é urgente enquanto for
+  grupo + Neon.
 
 ---
 
