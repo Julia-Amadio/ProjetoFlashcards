@@ -3,22 +3,24 @@ package com.projflashcards.backend.service;
 import com.projflashcards.backend.dto.UserCreateDTO;
 import com.projflashcards.backend.dto.UserResponseDTO;
 import com.projflashcards.backend.dto.UserUpdateDTO;
+import com.projflashcards.backend.exception.ConflictException;
+import com.projflashcards.backend.exception.ResourceNotFoundException;
 import com.projflashcards.backend.model.User;
 import com.projflashcards.backend.repository.UserRepository;
 import com.projflashcards.backend.security.SecurityUtils;
 import com.projflashcards.backend.security.UserDetailsImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service //Indica ao Spring que contém lógica de negócio
 public class UserService {
@@ -38,12 +40,12 @@ public class UserService {
     public UserResponseDTO registerUser(UserCreateDTO dto) {
         //Regra 1: e-mail deve ser único
         if (userRepository.existsByEmail(dto.email())) {
-            throw new RuntimeException("E-mail já cadastrado.");
+            throw new ConflictException("E-mail já cadastrado.");
         }
 
         //Regra 2: nome de usuário deve ser único
         if (userRepository.existsByName(dto.name())) {
-            throw new RuntimeException("Nome de usuário já está em uso.");
+            throw new ConflictException("Nome de usuário já está em uso.");
         }
 
         String encodedPassword = passwordEncoder.encode(dto.password());
@@ -59,12 +61,12 @@ public class UserService {
         securityUtils.validatePermissions(id); //<--- Chamando agora do Utils
 
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         //Se enviou um nome diferente do atual, verifica se já não tem dono
         if (dto.name() != null && !dto.name().equals(user.getName())) {
             if (userRepository.existsByName(dto.name())) {
-                throw new RuntimeException("Este nome de usuário já está em uso.");
+                throw new ConflictException("Este nome de usuário já está em uso.");
             }
             user.setName(dto.name());
         }
@@ -72,7 +74,7 @@ public class UserService {
         //Se enviou um e-mail diferente do atual, verifica se já não tem dono
         if (dto.email() != null && !dto.email().equals(user.getEmail())) {
             if (userRepository.existsByEmail(dto.email())) {
-                throw new RuntimeException("Este e-mail já está em uso.");
+                throw new ConflictException("Este e-mail já está em uso.");
             }
             user.setEmail(dto.email());
         }
@@ -85,10 +87,11 @@ public class UserService {
         return new UserResponseDTO(updatedUser); //Converte aqui
     }
 
-    public List<UserResponseDTO> findAllUsers() {
-        return userRepository.findAll().stream()
-                .map(UserResponseDTO::new)
-                .collect(Collectors.toList());
+    //Paginado pelo mesmo motivo do DeckService: evita devolver a tabela de usuários inteira
+    //numa única resposta.
+    @Transactional(readOnly = true)
+    public Page<UserResponseDTO> findAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable).map(UserResponseDTO::new);
     }
 
     public Optional<UserResponseDTO> findById(UUID id) {

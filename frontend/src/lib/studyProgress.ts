@@ -1,4 +1,5 @@
-import { readStorage, writeStorage } from './storage'
+import { api } from './api'
+import type { ApiStudyProgress } from '../types'
 
 export type StudyResults = {
   again: number
@@ -11,42 +12,40 @@ export type StudyProgress = {
   revealed: boolean
   completed: boolean
   results: StudyResults
-  updatedAt: string
 }
 
 const emptyResults: StudyResults = { again: 0, almost: 0, easy: 0 }
+export const emptyStudyProgress: StudyProgress = { index: 0, revealed: false, completed: false, results: emptyResults }
 
-function storageKey(email: string, deckId: number) {
-  return `karta.study.${email}.${deckId}`
-}
-
-export function loadStudyProgress(email: string, deckId: number, cardCount: number): StudyProgress {
-  const fallback: StudyProgress = { index: 0, revealed: false, completed: false, results: emptyResults, updatedAt: '' }
-  try {
-    const saved = JSON.parse(readStorage(storageKey(email, deckId)) || 'null') as Partial<StudyProgress> | null
-    if (!saved) return fallback
-    return {
-      index: Math.min(Math.max(Number(saved.index) || 0, 0), cardCount - 1),
-      revealed: saved.revealed === true,
-      completed: saved.completed === true,
-      results: {
-        again: Math.max(Number(saved.results?.again) || 0, 0),
-        almost: Math.max(Number(saved.results?.almost) || 0, 0),
-        easy: Math.max(Number(saved.results?.easy) || 0, 0),
-      },
-      updatedAt: typeof saved.updatedAt === 'string' ? saved.updatedAt : '',
-    }
-  } catch {
-    return fallback
+function fromApi(progress: ApiStudyProgress): StudyProgress {
+  return {
+    index: progress.index,
+    revealed: progress.revealed,
+    completed: progress.completed,
+    results: progress.results,
   }
 }
 
-export function saveStudyProgress(email: string, deckId: number, progress: Omit<StudyProgress, 'updatedAt'>) {
-  return writeStorage(storageKey(email, deckId), JSON.stringify({ ...progress, updatedAt: new Date().toISOString() }))
+// Busca o progresso salvo no backend (GET /users/{userId}/study-progress/{deckId}).
+// Se o usuário nunca estudou esse deck (ou a chamada falha), devolve progresso zerado —
+// a sessão de estudo sempre consegue começar do zero em vez de travar a tela.
+export async function loadStudyProgress(
+  userId: string,
+  deckId: number,
+  token: string,
+  signal?: AbortSignal,
+): Promise<StudyProgress> {
+  try {
+    const response = await api.getStudyProgress(userId, deckId, token, signal)
+    return fromApi(response)
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    return emptyStudyProgress
+  }
 }
 
-export function progressPercentage(progress: StudyProgress, cardCount: number) {
-  if (progress.completed) return 100
-  const answered = progress.results.again + progress.results.almost + progress.results.easy
-  return Math.round((Math.min(answered, cardCount) / cardCount) * 100)
+// Salva (upsert) o progresso no backend. Falha aqui não deve travar a sessão de estudo em
+// andamento — o usuário continua revisando os cartões mesmo que a persistência falhe.
+export function saveStudyProgress(userId: string, deckId: number, token: string, progress: StudyProgress) {
+  return api.saveStudyProgress(userId, deckId, token, progress).catch(() => undefined)
 }

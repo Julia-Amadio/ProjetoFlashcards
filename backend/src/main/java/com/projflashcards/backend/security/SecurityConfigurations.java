@@ -38,7 +38,9 @@ public class SecurityConfigurations {
 
 					//Rotas administrativas — apenas usuários com ROLE_ADMIN
 					.requestMatchers(HttpMethod.GET, "/users").hasAuthority("ROLE_ADMIN")
-					.requestMatchers(HttpMethod.DELETE, "/users/**").hasAuthority("ROLE_ADMIN")
+					//"/users/*" (um segmento só) para não capturar "/users/{id}/favorites/{deckId}",
+					//que precisa ficar liberado para o próprio usuário remover seus favoritos.
+					.requestMatchers(HttpMethod.DELETE, "/users/*").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.POST, "/decks/generate").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.POST, "/decks").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.POST, "/decks/*/flashcards").hasAuthority("ROLE_ADMIN")

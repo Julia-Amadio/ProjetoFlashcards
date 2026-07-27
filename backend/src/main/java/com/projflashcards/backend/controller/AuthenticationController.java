@@ -2,6 +2,7 @@ package com.projflashcards.backend.controller;
 
 import com.projflashcards.backend.dto.AuthenticationDTO;
 import com.projflashcards.backend.dto.LoginResponseDTO;
+import com.projflashcards.backend.dto.UserResponseDTO;
 import com.projflashcards.backend.security.TokenService;
 import com.projflashcards.backend.security.UserDetailsImpl;
 import jakarta.validation.Valid;
@@ -40,6 +41,6 @@ public class AuthenticationController {
         //Pegamos a entidade User de dentro do nosso Wrapper e geramos o token JWT
         var token = tokenService.generateToken(userDetails.getUser());
 
-        return ResponseEntity.ok(new LoginResponseDTO(token));
+        return ResponseEntity.ok(new LoginResponseDTO(token, new UserResponseDTO(userDetails.getUser())));
     }
 }

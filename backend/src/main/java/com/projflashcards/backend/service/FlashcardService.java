@@ -3,6 +3,7 @@ package com.projflashcards.backend.service;
 import com.projflashcards.backend.dto.FlashcardCreateDTO;
 import com.projflashcards.backend.dto.FlashcardDTO;
 import com.projflashcards.backend.dto.FlashcardUpdateDTO;
+import com.projflashcards.backend.exception.ResourceNotFoundException;
 import com.projflashcards.backend.model.Flashcard;
 import com.projflashcards.backend.repository.DeckRepository;
 import com.projflashcards.backend.repository.FlashcardRepository;
@@ -25,7 +26,7 @@ public class FlashcardService {
     @Transactional
     public FlashcardDTO create(Long deckId, FlashcardCreateDTO dto) {
         var deck = deckRepository.findById(deckId)
-                .orElseThrow(() -> new RuntimeException("Deck não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Deck não encontrado"));
 
         var card = new Flashcard(deck, dto.targetWord(), dto.phoneticReading(),
                 dto.nativeTranslation(), dto.partOfSpeech(), dto.targetSentence(),
@@ -44,14 +45,14 @@ public class FlashcardService {
     @Transactional(readOnly = true)
     public FlashcardDTO findById(Long id) {
         var card = flashcardRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Flashcard não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Flashcard não encontrado"));
         return toDTO(card);
     }
 
     @Transactional
     public FlashcardDTO update(Long id, FlashcardUpdateDTO dto) {
         var card = flashcardRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Flashcard não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Flashcard não encontrado"));
 
         if (dto.targetWord() != null) card.setTargetWord(dto.targetWord());
         if (dto.phoneticReading() != null) card.setPhoneticReading(dto.phoneticReading());
@@ -68,7 +69,7 @@ public class FlashcardService {
     @Transactional
     public void delete(Long id) {
         if (!flashcardRepository.existsById(id)) {
-            throw new RuntimeException("Flashcard não encontrado");
+            throw new ResourceNotFoundException("Flashcard não encontrado");
         }
         flashcardRepository.deleteById(id);
     }

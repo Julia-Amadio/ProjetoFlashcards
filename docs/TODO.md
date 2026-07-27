@@ -9,6 +9,12 @@ correria — pode virar cards num Trello (ou equivalente) quando o grupo organiz
 
 _Nenhuma task pendente no backend._
 
+## Frontend (React / TypeScript)
+
+- [ ] Adicionar o frontend ao Docker Compose ou documentar o modelo de deploy separado quando essa
+  decisão for tomada.
+- [ ] Adicionar testes automatizados da interface e do cliente HTTP.
+
 ## python-services (Python / FastAPI)
 
 - [ ] Refatoração geral do módulo — hoje é só o stub de `main.py`; `buscador_imagens.py`,
@@ -44,3 +50,11 @@ _Nenhuma task pendente no backend._
 - `AuthenticationController.login` retorna token em JSON (`LoginResponseDTO`)
 - Endpoint de geração via IA (`POST /decks/generate`) com integração Java ↔ Python (Pydantic + RestTemplate + persistência)
 - CRUD de `flashcards` (criar, listar, editar, remover) restrito a `ROLE_ADMIN`
+- Tela de estudo (`/study/{id}`) integrada aos endpoints reais de flashcards (`GET /decks/{id}` e
+  `GET /decks/{id}/flashcards`), substituindo os dados estáticos de `frontend/src/data/decks.ts`
+- Sessão de estudo não fica mais indisponível para um deck do `GET /decks` cujo ID não exista nos
+  dados demonstrativos (consequência direta do ponto anterior)
+- Favoritos via `/users/{userId}/favorites` (`GET`/`POST`/`DELETE`), com o login devolvendo e o
+  frontend guardando o UUID do usuário além do token
+- Progresso de estudo e preferências persistidos no backend (`/users/{userId}/study-progress/{deckId}`
+  e `/users/{userId}/preferences`), substituindo o armazenamento local (`localStorage`)
