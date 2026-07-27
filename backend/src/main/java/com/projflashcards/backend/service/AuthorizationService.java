@@ -48,6 +48,6 @@ public class AuthorizationService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado com o email: " + username));
 
         //Mais limpo e direto:
-        return new UserDetailsImpl(user); 
+        return new UserDetailsImpl(user);
     }
 }

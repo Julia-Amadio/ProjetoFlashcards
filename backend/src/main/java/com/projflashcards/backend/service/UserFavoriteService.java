@@ -1,6 +1,7 @@
 package com.projflashcards.backend.service;
 
 import com.projflashcards.backend.dto.DeckSummaryDTO;
+import com.projflashcards.backend.exception.ResourceNotFoundException;
 import com.projflashcards.backend.model.Deck;
 import com.projflashcards.backend.model.User;
 import com.projflashcards.backend.repository.DeckRepository;
@@ -34,10 +35,10 @@ public class UserFavoriteService {
         securityUtils.validatePermissions(userId);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         Deck deck = deckRepository.findById(deckId)
-                .orElseThrow(() -> new RuntimeException("Deck não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Deck não encontrado"));
 
         //O Hibernate cuida de inserir na tabela user_favorite_decks
         user.getFavoriteDecks().add(deck);
@@ -50,13 +51,13 @@ public class UserFavoriteService {
         securityUtils.validatePermissions(userId);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         //removeIf percorre a lista e remove o deck que tiver o ID correspondente
         boolean removed = user.getFavoriteDecks().removeIf(deck -> deck.getId().equals(deckId));
 
         if (!removed) {
-            throw new RuntimeException("Este deck não está nos favoritos do usuário");
+            throw new ResourceNotFoundException("Este deck não está nos favoritos do usuário");
         }
 
         userRepository.save(user);
@@ -68,7 +69,7 @@ public class UserFavoriteService {
         securityUtils.validatePermissions(userId);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         //Converte a lista de entidades (Set<Deck>) para a lista de DTOs
         return user.getFavoriteDecks().stream()
