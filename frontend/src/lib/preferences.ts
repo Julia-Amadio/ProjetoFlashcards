@@ -1,10 +1,7 @@
-import { readStorage, writeStorage } from './storage'
+import { api } from './api'
+import type { ApiUserPreferences } from '../types'
 
-export type StudyPreferences = {
-  dailyGoal: number
-  autoplayAudio: boolean
-  confirmExit: boolean
-}
+export type StudyPreferences = ApiUserPreferences
 
 export const defaultPreferences: StudyPreferences = {
   dailyGoal: 10,
@@ -12,23 +9,32 @@ export const defaultPreferences: StudyPreferences = {
   confirmExit: true,
 }
 
-function storageKey(email: string) {
-  return `karta.preferences.${email}`
-}
+const allowedDailyGoals = [5, 10, 15, 20, 30]
 
-export function loadPreferences(email: string): StudyPreferences {
+// Busca as preferências salvas no backend (GET /users/{userId}/preferences).
+// Se o usuário nunca configurou nada (ou a chamada falha), devolve os padrões do app.
+export async function loadPreferences(
+  userId: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<StudyPreferences> {
   try {
-    const saved = JSON.parse(readStorage(storageKey(email)) || '{}') as Partial<StudyPreferences>
-    return {
-      dailyGoal: [5, 10, 15, 20, 30].includes(saved.dailyGoal ?? 0) ? saved.dailyGoal! : defaultPreferences.dailyGoal,
-      autoplayAudio: typeof saved.autoplayAudio === 'boolean' ? saved.autoplayAudio : defaultPreferences.autoplayAudio,
-      confirmExit: typeof saved.confirmExit === 'boolean' ? saved.confirmExit : defaultPreferences.confirmExit,
-    }
-  } catch {
+    const response = await api.getPreferences(userId, token, signal)
+    return allowedDailyGoals.includes(response.dailyGoal)
+      ? response
+      : { ...response, dailyGoal: defaultPreferences.dailyGoal }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
     return defaultPreferences
   }
 }
 
-export function savePreferences(email: string, preferences: StudyPreferences) {
-  return writeStorage(storageKey(email), JSON.stringify(preferences))
+// Salva as preferências no backend. Devolve true/false pra tela mostrar confirmação ou erro.
+export async function savePreferences(userId: string, token: string, preferences: StudyPreferences): Promise<boolean> {
+  try {
+    await api.savePreferences(userId, token, preferences)
+    return true
+  } catch {
+    return false
+  }
 }

@@ -2,13 +2,14 @@ package com.projflashcards.backend.service;
 
 import com.projflashcards.backend.dto.DeckCreateDTO;
 import com.projflashcards.backend.dto.DeckSummaryDTO;
+import com.projflashcards.backend.exception.ResourceNotFoundException;
 import com.projflashcards.backend.model.Deck;
 import com.projflashcards.backend.repository.DeckRepository;
 import com.projflashcards.backend.security.SecurityUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class DeckService {
@@ -31,17 +32,17 @@ public class DeckService {
         return toSummary(deck);
     }
 
+    //Paginado: devolve uma "página" de decks por vez em vez da tabela inteira de uma só
+    //requisição — importante pra não virar um problema quando o catálogo crescer.
     @Transactional(readOnly = true)
-    public List<DeckSummaryDTO> listAll() {
-        return deckRepository.findAll().stream()
-                .map(this::toSummary)
-                .toList();
+    public Page<DeckSummaryDTO> listAll(Pageable pageable) {
+        return deckRepository.findAll(pageable).map(this::toSummary);
     }
 
     @Transactional(readOnly = true)
     public DeckSummaryDTO findById(Long id) {
         var deck = deckRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Deck não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Deck não encontrado"));
         return toSummary(deck);
     }
 

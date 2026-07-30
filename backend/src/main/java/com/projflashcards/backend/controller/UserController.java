@@ -7,11 +7,13 @@ import com.projflashcards.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 /* O professor usou @Controller (usado quando retornamos páginas HTML).
@@ -46,9 +48,11 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    //Aceita ?page=&size=&sort= na URL, mesmo esquema do GET /decks.
     @GetMapping
-    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
-        return ResponseEntity.ok(userService.findAllUsers());
+    public ResponseEntity<Page<UserResponseDTO>> getAllUsers(
+            @PageableDefault(size = 50, sort = "name") Pageable pageable) {
+        return ResponseEntity.ok(userService.findAllUsers(pageable));
     }
 
     @PutMapping("/{id}")

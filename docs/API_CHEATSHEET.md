@@ -5,15 +5,16 @@ tanto para testes rápidos via terminal (cURL) quanto via Postman. Os corpos de 
 aqui especificados são os mesmos nos dois casos — a única diferença real de um pro outro está em
 como o *Bearer Token* é passado, explicado logo abaixo.
 
-> Este documento cobre apenas rotas que já existem no código. O CRUD de `flashcards` e a rota de
-> geração via IA (`POST /decks/generate`) ainda não existem — ver `ARCHITECTURE.md`, seção 7,
-> para o desenho planejado dessa integração.
+> A geração de deck via IA (`POST /decks/generate`) depende do `python-services` estar de pé e
+> configurado (chave de LLM, Pexels, Edge-TTS) — ver `docs/ARCHITECTURE.md`, seção 6, e
+> `docs/DEPLOY.md` para o estado atual disso.
 
 ---
 
 # IMPORTANTE: Uso do *Bearer Token*
-Com exceção de `POST /login`, `POST /users` e das páginas do Swagger/OpenAPI, todas as rotas
-abaixo são protegidas e exigem um *bearer token* (JWT) válido no cabeçalho de autorização.
+Com exceção de `POST /login` e `POST /users`, todas as rotas abaixo são protegidas e exigem um
+*bearer token* (JWT) válido no cabeçalho de autorização. Rotas marcadas **ROLE_ADMIN** exigem
+que o usuário do token tenha essa role — qualquer outro usuário recebe `403`.
 
 ### Em requisições usando cURL
 Os cabeçalhos (`-H`) precisam ser construídos manualmente. Para obter o token, faça login primeiro:
@@ -22,19 +23,14 @@ curl -X POST http://localhost:8080/login \
      -H "Content-Type: application/json" \
      -d '{"email":"myemail@example.com", "password":"Password123!@#"}'
 ```
-Se as credenciais forem válidas, o terminal retorna um objeto JSON no formato:
-```json
-{"token":"eyJ..."}
-```
-Copie apenas o valor de `token` e insira em
-`-H "Authorization: Bearer SEU-TOKEN-AQUI"` nas rotas protegidas. Não esqueça da palavra
-`Bearer` antes do token, separada por um espaço.
+A resposta é um JSON com o token e os dados do usuário (ver seção `login` abaixo). Copie o valor
+de `"token"` e insira em `-H "Authorization: Bearer SEU-TOKEN-AQUI"` nas rotas protegidas. Não
+esqueça da palavra `Bearer` antes do token, separada por um espaço.
 
 ### Em requisições usando Postman
-O JWT presente no campo `token` da resposta de `POST http://localhost:8080/login` deve ser
-inserido na guia `Authorization` antes de realizar requisições protegidas. Selecione
-`Bearer Token` no dropdown `Auth Type` e cole o token (sem a palavra `Bearer`, o Postman já
-adiciona isso por você).
+O JWT retornado por `POST http://localhost:8080/login` (campo `token` do JSON) deve ser inserido
+na guia `Authorization` antes de realizar requisições protegidas. Selecione `Bearer Token` no
+dropdown `Auth Type` e cole o token (sem a palavra `Bearer`, o Postman já adiciona isso por você).
 [![token-Demonstration.png](https://i.postimg.cc/RhLQN9pT/token-Demonstration.png)](https://postimg.cc/zH3RQmrL)
 
 ---
@@ -48,9 +44,14 @@ curl -X POST http://localhost:8080/login \
      -H "Content-Type: application/json" \
      -d '{"email":"myemail@example.com", "password":"Password123!@#"}'
 ```
-Resposta: `200 OK` com `LoginResponseDTO` (`{"token":"..."}`). O token identifica o usuário pelo
-e-mail, usa o issuer `auth-api` e expira quatro horas após a criação. Credenciais inválidas
-retornam erro de autenticação.
+Resposta: `200 OK` com `LoginResponseDTO` — **JSON**, não texto puro:
+```json
+{
+  "token": "eyJhbGciOi...",
+  "user": { "id": "uuid...", "name": "...", "email": "...", "role": "ROLE_USER", "createdAt": "..." }
+}
+```
+Credenciais inválidas retornam erro de autenticação antes mesmo de chegar ao Controller.
 
 ---
 
@@ -78,13 +79,15 @@ curl -X POST http://localhost:8080/users \
 Resposta: `201 Created` com `UserResponseDTO` (`id`, `name`, `email`, `role`, `createdAt` — nunca
 o hash da senha).
 
-## Listar todos os usuários (`GET /users`)
-Exige token de **Administrador** (`ROLE_ADMIN`) no cabeçalho — usuário comum recebe `403`.
+## Listar todos os usuários (`GET /users`) — **ROLE_ADMIN**
+Paginado (`Page<UserResponseDTO>`, Spring Data). Aceita `?page=&size=&sort=` na URL — sem
+parâmetros, usa página 0, 50 usuários, ordenado por nome.
 ```bash
 curl -X GET http://localhost:8080/users \
      -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
 ```
-Resposta: `200 OK` com uma lista de `UserResponseDTO`.
+Resposta: `200 OK` com objeto de página do Spring (`content`, `totalElements`, `totalPages`, etc.
+— o array de usuários fica em `content`).
 
 ## Buscar usuário específico por `UUID` (`GET /users/{id}`)
 Substitua `SEU-UUID-AQUI` pelo UUID real de um usuário. Exige que o token pertença ao
@@ -111,57 +114,137 @@ curl -X PUT http://localhost:8080/users/SEU-UUID-AQUI \
 > deve ser substituído pelo do Bearer Token — é possível (e necessário) usar os dois `-H` na mesma
 > chamada. A ordem entre eles não importa para o servidor.
 
-> **NOTA:** apesar de existir uma regra administrativa para `DELETE /users/**` no
-> `SecurityConfigurations`, nenhum método `@DeleteMapping` foi implementado no
-> `UserController`. Portanto, exclusão de usuário ainda não é uma rota disponível.
-
 ---
 
-# `decks` — Catálogo de decks
+# `decks` — Decks
 
-As respostas das três rotas usam `DeckSummaryDTO`: `id`, `title`, `language` e
-`difficultyLevel`. Descrição, autor e data de criação são persistidos, mas não aparecem nesse DTO.
-
-## Criar um deck (`POST /decks`)
-Exige token de **Administrador** (`ROLE_ADMIN`). O autor não é enviado no JSON: o backend usa o
-usuário autenticado no token.
-
-*Constraints* (`DeckCreateDTO`):
-* `title` é obrigatório e possui no máximo 100 caracteres;
-* `language` é obrigatório e possui no máximo 50 caracteres;
-* `description` é opcional e não possui limite definido no DTO;
-* `difficultyLevel` é opcional e possui no máximo 50 caracteres.
+## Criar um deck manualmente (`POST /decks`) — **ROLE_ADMIN**
+*Constraints* (`DeckCreateDTO`): `title` (obrigatório, máx. 100), `description` (livre),
+`language` (obrigatório, máx. 50), `difficultyLevel` (opcional, máx. 50).
 ```bash
 curl -X POST http://localhost:8080/decks \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer INSIRA_TOKEN_ADMIN_AQUI" \
      -d '{
-           "title": "Inglês para viagens",
-           "description": "Vocabulário para aeroporto e hotel.",
-           "language": "Inglês",
-           "difficultyLevel": "Iniciante"
+           "title": "Saudações básicas",
+           "description": "Cumprimentos do dia a dia",
+           "language": "english",
+           "difficultyLevel": "A1"
          }'
 ```
-Resposta: `201 Created` com o `DeckSummaryDTO` do deck criado.
+Resposta: `201 Created` com `DeckSummaryDTO` (`id`, `title`, `language`, `difficultyLevel`).
+
+## Gerar um deck via IA (`POST /decks/generate`) — **ROLE_ADMIN**
+Dispara a geração completa: Java chama o `python-services`, que gera texto (OpenAI/Gemini),
+busca imagem (Pexels) e sintetiza áudio (Edge-TTS) pra cada card; o Java baixa essa mídia e
+persiste tudo (ver `docs/ARCHITECTURE.md`, seção 6).
+
+*Constraints* (`DeckGenerateDTO`): `topic` (obrigatório, máx. 200), `language` (obrigatório,
+máx. 50), `difficultyLevel` (opcional, máx. 50).
+```bash
+curl -X POST http://localhost:8080/decks/generate \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer INSIRA_TOKEN_ADMIN_AQUI" \
+     -d '{
+           "topic": "cumprimentos do dia a dia",
+           "language": "english",
+           "difficultyLevel": "A1"
+         }'
+```
+Resposta: `201 Created` com `DeckSummaryDTO` do deck já persistido (cards inclusos no banco,
+consultáveis depois via `GET /decks/{deckId}/flashcards`). Pode demorar alguns segundos —
+depende da resposta do LLM e do download de imagem/áudio.
 
 ## Listar todos os decks (`GET /decks`)
-Aceita qualquer token válido. A busca não possui paginação, ordenação ou filtros no backend.
+Paginado, igual `GET /users`. Qualquer usuário autenticado pode listar.
 ```bash
 curl -X GET http://localhost:8080/decks \
      -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
 ```
-Resposta: `200 OK` com uma lista de `DeckSummaryDTO`.
 
-## Buscar deck por ID (`GET /decks/{id}`)
-Aceita qualquer token válido.
+## Buscar deck por `id` (`GET /decks/{id}`)
 ```bash
 curl -X GET http://localhost:8080/decks/1 \
      -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
 ```
-Resposta: `200 OK` com `DeckSummaryDTO`. ID inexistente dispara o erro
-`Deck não encontrado`; como o projeto ainda não possui tratamento global de exceções e oculta
-mensagens de erro no `application.properties`, esse caso atualmente chega ao cliente como erro
-do servidor sem a mensagem interna.
+
+---
+
+# `flashcards` — Cards de um deck
+
+## Criar um card manualmente (`POST /decks/{deckId}/flashcards`) — **ROLE_ADMIN**
+*Constraints* (`FlashcardCreateDTO`): `targetWord` (obrigatório, máx. 100), `phoneticReading`
+(opcional, máx. 100), `nativeTranslation` (obrigatório, máx. 255), `partOfSpeech` (opcional,
+máx. 50), `targetSentence`/`sentencePhonetic`/`sentenceTranslation` (todos opcionais, texto livre).
+```bash
+curl -X POST http://localhost:8080/decks/1/flashcards \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer INSIRA_TOKEN_ADMIN_AQUI" \
+     -d '{
+           "targetWord": "hello",
+           "phoneticReading": "/həˈloʊ/",
+           "nativeTranslation": "olá",
+           "partOfSpeech": "interjection",
+           "targetSentence": "Hello, how are you?",
+           "sentencePhonetic": "/həˈloʊ haʊ ɑːr juː/",
+           "sentenceTranslation": "Olá, como você está?"
+         }'
+```
+Resposta: `201 Created` com `FlashcardDTO` (sem imagem/áudio — cards criados manualmente não têm
+mídia; só os gerados via `/decks/generate` têm).
+
+## Listar cards de um deck (`GET /decks/{deckId}/flashcards`)
+Qualquer usuário autenticado (é a rota usada pela tela de estudo).
+```bash
+curl -X GET http://localhost:8080/decks/1/flashcards \
+     -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
+```
+
+## Buscar card específico (`GET /flashcards/{id}`)
+```bash
+curl -X GET http://localhost:8080/flashcards/1 \
+     -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
+```
+
+## Atualizar um card (`PUT /flashcards/{id}`) — **ROLE_ADMIN**
+Todos os campos opcionais (`FlashcardUpdateDTO`), mesma lógica de "só envia o que quer mudar".
+```bash
+curl -X PUT http://localhost:8080/flashcards/1 \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer INSIRA_TOKEN_ADMIN_AQUI" \
+     -d '{ "nativeTranslation": "olá / oi" }'
+```
+
+## Remover um card (`DELETE /flashcards/{id}`) — **ROLE_ADMIN**
+```bash
+curl -X DELETE http://localhost:8080/flashcards/1 \
+     -H "Authorization: Bearer INSIRA_TOKEN_ADMIN_AQUI"
+```
+Resposta: `204 No Content`.
+
+## Mídia de um card (imagem e áudio)
+Só existe conteúdo nesses três endpoints pra cards **gerados via IA** — cards criados
+manualmente não têm imagem/áudio, e as rotas devolvem `404`. Os bytes ficam salvos direto no
+Postgres (`bytea`), não em URL externa nem bucket — qualquer usuário autenticado pode acessar.
+
+```bash
+# Imagem (Content-Type varia: image/jpeg, image/png, etc.)
+curl -X GET http://localhost:8080/flashcards/1/image \
+     -H "Authorization: Bearer INSIRA_TOKEN_AQUI" \
+     --output card1.jpg
+
+# Áudio da palavra (audio/mpeg)
+curl -X GET http://localhost:8080/flashcards/1/audio/word \
+     -H "Authorization: Bearer INSIRA_TOKEN_AQUI" \
+     --output card1-word.mp3
+
+# Áudio da frase de exemplo (audio/mpeg)
+curl -X GET http://localhost:8080/flashcards/1/audio/sentence \
+     -H "Authorization: Bearer INSIRA_TOKEN_AQUI" \
+     --output card1-sentence.mp3
+```
+No Postman, essas três rotas são melhor visualizadas na aba **"Send and Download"** (ou abrindo a
+resposta na aba "Preview") em vez do modo padrão de texto/JSON.
 
 ---
 
@@ -191,16 +274,54 @@ curl -X DELETE http://localhost:8080/users/SEU-UUID-AQUI/favorites/1 \
      -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
 ```
 Resposta: `204 No Content` em caso de sucesso. Se o deck não estiver nos favoritos do usuário,
-o service dispara `Este deck não está nos favoritos do usuário`; a observação sobre ausência de
-tratamento global de exceções também se aplica aqui.
+retorna erro (`Este deck não está nos favoritos do usuário`).
 
 ---
 
-# `python-services` — Estado atual
+# `users/{userId}/study-progress` — Progresso de estudo
 
-O serviço FastAPI fica na porta `8000`, mas hoje só expõe uma rota:
+Mesma regra de permissão de `/users/{id}` (dono do recurso ou `ROLE_ADMIN`).
+
+## Buscar progresso de um deck (`GET /users/{userId}/study-progress/{deckId}`)
 ```bash
-curl http://localhost:8000/
+curl -X GET http://localhost:8080/users/SEU-UUID-AQUI/study-progress/1 \
+     -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
 ```
-Resposta: `200 OK` com `{"status":"AI Service running"}`. Essa mesma rota é usada pelo
-`HEALTHCHECK` da imagem. Os módulos de geração ainda não estão expostos por HTTP.
+Resposta: `StudyProgressDTO` (`deckId`, `index` — posição atual no deck, `revealed`, `completed`,
+`results` com `{again, almost, easy}`, `updatedAt`).
+
+## Salvar progresso (`PUT /users/{userId}/study-progress/{deckId}`)
+```bash
+curl -X PUT http://localhost:8080/users/SEU-UUID-AQUI/study-progress/1 \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer INSIRA_TOKEN_AQUI" \
+     -d '{
+           "index": 3,
+           "revealed": false,
+           "completed": false,
+           "results": { "again": 1, "almost": 0, "easy": 2 }
+         }'
+```
+
+---
+
+# `users/{userId}/preferences` — Preferências do usuário
+
+Mesma regra de permissão de `/users/{id}`.
+
+## Buscar preferências (`GET /users/{userId}/preferences`)
+```bash
+curl -X GET http://localhost:8080/users/SEU-UUID-AQUI/preferences \
+     -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
+```
+Resposta: `UserPreferencesDTO` (`dailyGoal`, `autoplayAudio`, `confirmExit`).
+
+## Salvar preferências (`PUT /users/{userId}/preferences`)
+Todos os três campos são obrigatórios nesse DTO (`UserPreferencesSaveDTO`), diferente do
+`PUT /users/{id}` — não dá pra mandar só um campo.
+```bash
+curl -X PUT http://localhost:8080/users/SEU-UUID-AQUI/preferences \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer INSIRA_TOKEN_AQUI" \
+     -d '{ "dailyGoal": 20, "autoplayAudio": true, "confirmExit": true }'
+```

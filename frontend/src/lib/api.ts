@@ -1,9 +1,12 @@
-import type { DeckSummary, User } from '../types'
+import type { ApiFlashcard, ApiStudyProgress, ApiUserPreferences, DeckSummary, User } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 type ApiErrorBody = { message?: string; detail?: string; errors?: Record<string, string> }
-type LoginResponse = { token: string }
+type LoginResponse = { token: string; user: User }
+// GET /decks e GET /users agora vêm paginados (Page<T> do Spring Data) — só usamos o
+// conteúdo da primeira página por enquanto, sem UI de paginação ainda.
+type PageResponse<T> = { content: T[] }
 
 export const SESSION_UNAUTHORIZED_EVENT = 'karta:session-unauthorized'
 
@@ -64,15 +67,58 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     })
-    if (!response?.token || typeof response.token !== 'string') {
+    if (!response?.token || typeof response.token !== 'string' || !response.user?.id) {
       throw new ApiError('O servidor retornou uma resposta de login inválida.', 502)
     }
-    return response.token
+    return { token: response.token, user: response.user }
   },
 
   register: (data: { name: string; email: string; password: string }) =>
     request<User>('/users', { method: 'POST', body: JSON.stringify(data) }),
 
+  updateUser: (userId: string, token: string, data: { name?: string; password?: string }) =>
+    request<User>(`/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) }, token),
+
   listDecks: (token: string, signal?: AbortSignal) =>
-    request<DeckSummary[]>('/decks', { signal }, token),
+    request<PageResponse<DeckSummary>>('/decks', { signal }, token).then(page => page.content),
+
+  getDeck: (id: number, token: string, signal?: AbortSignal) =>
+    request<DeckSummary>(`/decks/${id}`, { signal }, token),
+
+  listFlashcards: (deckId: number, token: string, signal?: AbortSignal) =>
+    request<ApiFlashcard[]>(`/decks/${deckId}/flashcards`, { signal }, token),
+
+  getFavorites: (userId: string, token: string, signal?: AbortSignal) =>
+    request<DeckSummary[]>(`/users/${userId}/favorites`, { signal }, token),
+
+  addFavorite: (userId: string, deckId: number, token: string) =>
+    request<void>(`/users/${userId}/favorites/${deckId}`, { method: 'POST' }, token),
+
+  removeFavorite: (userId: string, deckId: number, token: string) =>
+    request<void>(`/users/${userId}/favorites/${deckId}`, { method: 'DELETE' }, token),
+
+  getStudyProgress: (userId: string, deckId: number, token: string, signal?: AbortSignal) =>
+    request<ApiStudyProgress>(`/users/${userId}/study-progress/${deckId}`, { signal }, token),
+
+  saveStudyProgress: (
+    userId: string,
+    deckId: number,
+    token: string,
+    progress: { index: number; revealed: boolean; completed: boolean; results: ApiStudyProgress['results'] },
+  ) =>
+    request<ApiStudyProgress>(
+      `/users/${userId}/study-progress/${deckId}`,
+      { method: 'PUT', body: JSON.stringify(progress) },
+      token,
+    ),
+
+  getPreferences: (userId: string, token: string, signal?: AbortSignal) =>
+    request<ApiUserPreferences>(`/users/${userId}/preferences`, { signal }, token),
+
+  savePreferences: (userId: string, token: string, preferences: ApiUserPreferences) =>
+    request<ApiUserPreferences>(
+      `/users/${userId}/preferences`,
+      { method: 'PUT', body: JSON.stringify(preferences) },
+      token,
+    ),
 }

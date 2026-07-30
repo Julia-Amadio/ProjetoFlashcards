@@ -7,11 +7,20 @@ de documentação auxiliar para todos os desenvolvedores do grupo.
 ## 1. Arquitetura do sistema
 ```
 ProjetoFlashcards/
+├── AGENTS.md                 # configuração de skills do agente
+├── CONTEXT.md                # glossário do domínio
 ├── docs/
+│   ├── adr/                  # decisões arquiteturais
+│   │   └── 0001-media-storage.md
+│   ├── agents/               # configuração do issue tracker, triage, domain docs
+│   │   ├── domain.md
+│   │   ├── issue-tracker.md
+│   │   └── triage-labels.md
 │   ├── ARCHITECTURE.md       # este arquivo
 │   ├── API_CHEATSHEET.md     # exemplos de requisição (cURL + Postman) para as rotas já existentes
 │   └── TODO.md               # checklist do que falta implementar, por módulo
-├── docker-compose.yml         # orquestra PostgreSQL + backend + python-services
+├── .scratch/                 # issues e specs locais (markdown)
+├── docker-compose.yml        # orquestra backend + python-services, único cenário de execução
 ├── backend/
 │   ├── src/main/java/com/projflashcards/backend/    # backend construído com Spring Boot
 │   ├── src/main/resources/
@@ -19,15 +28,16 @@ ProjetoFlashcards/
 │   │   └── application.properties    # conexão com BD, JWT, JPA e Swagger
 │   ├── Dockerfile            # build multi-stage do backend (Maven -> JRE)
 │   └── pom.xml               # dependências do backend, gerenciadas pelo Maven
-├── frontend/                 # React + TypeScript + Vite
-│   └── src/
-│       ├── data/             # decks/cartões demonstrativos usados na revisão
-│       ├── lib/              # API, JWT e persistência local
-│       └── pages/            # autenticação, dashboard, estudo e configurações
-└── python-services/
-    ├── main.py               # stub FastAPI usado pelo container
-    ├── test.py               # pipeline manual de geração (ainda fora da API)
-    ├── modulos/              # LLM, imagem, áudio, idiomas e exportação APKG
+├── frontend/
+└── python-services/          # serviço de IA para geração de flashcards
+    ├── main.py               # endpoint FastAPI (/generate, /)
+    ├── modulos/              # módulos de domínio
+    │   ├── llm_agent.py      # chamada ao OpenAI com modelos Pydantic por idioma
+    │   ├── buscador_imagens.py   # busca de imagens via Pexels
+    │   ├── gerador_audio.py      # síntese de voz via Edge-TTS
+    │   ├── gerador_apkg.py       # exportação para Anki (.apkg)
+    │   └── language_config.py    # configuração por idioma (voz, deck name)
+    ├── requirements.txt
     └── Dockerfile            # build multi-stage do serviço Python (builder -> runtime)
 ```
 
@@ -40,59 +50,28 @@ de decks e pratica os cartões demonstrativos.
 de forma centralizada os usuários, segurança (JWT), progresso de aprendizado e persiste 
 os dados no banco PostgreSQL.
 - **Python Service (FastAPI):** um serviço especializado (satélite) focado em processamento 
-pesado e IA. Ele não guarda estado (*stateless*) e atua apenas sob demanda do Spring Boot 
-para gerar frases (OpenAI), buscar imagens e sintetizar voz, isolando a complexidade 
-dessas bibliotecas do backend principal.
+pesado e IA. Ele não guarda estado (*stateless*) e atua apenas sob demanda do Spring Boot. 
+Gera flashcards via OpenAI, busca imagens representativas via Pexels e sintetiza áudio de 
+pronúncia via Edge-TTS. Retorna ao Java um JSON unificado com campos de texto + URLs 
+temporárias de mídia; o Java faz o download dos bytes e persiste tudo no PostgreSQL 
+(ver ADR-0001). Isola a complexidade das APIs externas do backend principal.
 
 Essa separação também evita que uma indisponibilidade da OpenAI/Pexels derrube autenticação,
 catálogo ou favoritos. Hoje essa independência é ainda mais direta: o backend depende do container
 Python estar iniciado, mas nenhuma rota Java implementada chama o serviço de IA.
 
-### 1.1 Banco local por padrão, Neon quando configurado
-O `docker-compose.yml` atual sobe três serviços: `postgres`, `backend` e `python-services`. O
-PostgreSQL local usa a porta `5434` do host (porta `5432` dentro da rede Docker) e persiste os
-dados no volume nomeado `postgres_data`.
+### Execução: um único cenário, sempre contra o Neon
+Todo o sistema sobe por um único `docker-compose.yml`, apontando sempre pro banco na nuvem (Neon) —
+tanto em desenvolvimento quanto em produção. **Não existe Postgres local em lugar nenhum** do projeto:
+o `application.properties` também não tem fallback de banco; sem as variáveis do Neon (`DB_URL`,
+`DB_USERNAME`, `DB_PASSWORD`), a aplicação simplesmente não sobe.
 
-O backend recebe as configurações por duas fontes:
-* O Compose exige e lê `backend/.env` através de `env_file`;
-* O bloco `environment` define `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
-  `SPRING_DATASOURCE_PASSWORD`, `API_SECURITY_TOKEN_SECRET` e `PYTHON_SERVICE_URL`, com valores
-  locais de *fallback*.
-
-As expressões `${DB_URL:-...}` desse bloco são resolvidas a partir do ambiente do shell ou do
-arquivo `.env` na **raiz** do projeto. Como valores de `environment` têm precedência sobre
-`env_file`, as chaves homônimas guardadas somente em `backend/.env` acabam sobrescritas pelos
-*fallbacks*. Esse detalhe é fácil de confundir: o arquivo `backend/.env` precisa existir, mas
-editar apenas ele não muda a conexão enquanto o Compose estiver estruturado dessa forma.
-
-> **RESUMO DO COMPORTAMENTO ATUAL:** as credenciais do Neon que foram distribuídas aos
-> integrantes dentro de `backend/.env` **não fazem o backend usar o Neon**. Se ninguém exportar
-> as variáveis no shell e não existir um `.env` na raiz, `docker compose up` injeta
-> `SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/flashcards_db`; portanto, quem recebe as
-> consultas é o PostgreSQL local. Nesse cenário, Neon não é o banco principal nem um *fallback*:
-> ele simplesmente não participa da execução.
-
-Com os *fallbacks*, o backend acessa `postgres:5432`, usando o nome do serviço na rede interna:
-```env
-DB_URL=jdbc:postgresql://postgres:5432/flashcards_db
-DB_USERNAME=flashcards_admin
-DB_PASSWORD=password123
-JWT_SECRET=troque-por-uma-chave-longa-e-aleatoria
-```
-
-Se `DB_URL` for definido no shell ou num `.env` da raiz apontando pro Neon, o backend passa a usar
-o banco remoto. O container `postgres` continua subindo porque ele ainda faz parte do
-`depends_on`, mas deixa de receber as consultas da aplicação. Essa possibilidade é útil, porém
-exige cuidado para não confundir dados locais com os compartilhados na nuvem.
-
-> **NOTA:** fora do Docker, o `application.properties` usa
-> `jdbc:postgresql://localhost:5434/flashcards_db` como *fallback*. Dentro do Docker, esse mesmo
-> endereço não funcionaria porque `localhost` apontaria pro próprio container do backend; é por
-> isso que o Compose injeta `postgres:5432`.
-
-O volume sobrevive a `docker compose down`. Para começar o banco local do zero seria necessário
-remover também o volume (`docker compose down -v`), operação destrutiva que apaga todos os dados
-locais.
+> Já existiu um `docker-compose.override.yml` que subia um Postgres local descartável, mesclado
+> automaticamente por cima do compose principal. Foi removido de propósito: teve gente do grupo com
+> drift de versão no Podman — a sintaxe recente da Compose Spec usada no override (`env_file` com
+> `required: false`) não rodava nesse ambiente — e um banco centralizado no Neon acabou sendo mais
+> simples de manter do que dois arquivos Compose sincronizados. Se alguém sujar os dados de teste, a
+> saída combinada é recriar a instância no Neon e redistribuir as credenciais no grupo.
 
 ---
 
@@ -136,19 +115,16 @@ retornando um erro amigável antes mesmo de tentar salvar no banco.
 ---
 
 ## 3. Stack - Python Services
-- **FastAPI:** framework web que deverá expor os scripts de IA como endpoints que o Java pode
-chamar. No estado atual, `main.py` possui somente `GET /`, usado também pelo healthcheck da imagem.
-- **OpenAI SDK:** integração usada por `llm_agent.py`, atualmente configurada com o modelo
-`gpt-5` e Structured Outputs via Pydantic.
+- **FastAPI:** framework web que expõe os scripts de IA como endpoints que o Java pode chamar.
+  - `GET /health` — liveness check, sem auth, retorna `{"status": "ok"}`
+  - `GET /` — rota genérica, retorna `{"status": "AI Service running"}`
+  - `POST /generate` — geração de flashcards, protegida por `INTERNAL_SECRET`
+- **OpenAI SDK:** para integração com o GPT-4o-mini (fallback) e o modelo `gpt-5` via 
+  `client.beta.chat.completions.parse` com resposta estruturada por idioma.
 - **Edge-TTS:** para gerar áudios com vozes neurais realistas sem custo.
-- **Pexels:** busca de imagens por termo em inglês.
-- **Genanki:** geração de pacotes `.apkg` para mandarim, inglês, francês e japonês.
-
-> **Estado atual:** os módulos de LLM, áudio, imagem e APKG existem, mas ainda não são importados
-> pelo `main.py`. O pipeline completo só é orquestrado por `test.py`, executado manualmente, e
-> escreve mídias temporárias/arquivos `.apkg` no disco. Além disso, `gerador_apkg.py` importa
-> `genanki`, mas essa biblioteca ainda não está declarada no `requirements.txt`; portanto, o
-> pipeline de exportação não funciona numa instalação limpa até essa dependência ser adicionada.
+- **Pydantic:** usado em duas camadas — models específicos por idioma (`llm_agent.py`) e 
+  schema unificado de resposta (`main.py`).
+- **Requests:** cliente HTTP para baixar imagens da API do Pexels.
 
 ---
 
@@ -357,14 +333,16 @@ Quem insere no banco, de fato, é sempre o Java — isso não é negociável, j�
 `Entities`/JPA e a conexão com o PostgreSQL. Mas a conversão/validação do JSON acontece em
 **duas camadas**, uma em cada módulo:
 
-1. **Python (camada 1 — a IA respondeu direito?):** o `python-services` chama o LLM e usa
-   **Pydantic** (já presente no `requirements.txt`) para forçar a resposta a bater com um
-   contrato combinado entre os dois módulos (ex: `{"deckTitle": ..., "cards": [{"front": ...,
-   "back": ...}]}`). Essa validação existe pra pegar alucinação ou erro de formatação da IA o
-   mais cedo possível — antes de gastar uma chamada de rede pro Java. **Importante:** o Python
-   não precisa (e não deve) saber nada sobre tabelas, colunas ou nomes de Entities do banco. Ele
-   só conhece o contrato JSON combinado, nada de schema do Postgres — isso mantém os dois
-   módulos desacoplados (se uma migration do Flyway mudar amanhã, o Python nem fica sabendo).
+1. **Python (camada 1 — a IA respondeu direito?):** o `python-services` chama o LLM com um
+   modelo Pydantic **específico do idioma** (`MandarinFlashcard`, `EnglishFlashcard`, etc.) para
+   garantir que a OpenAI devolve campos no formato esperado (hanzi + pinyin para mandarim,
+   palavra + IPA para inglês, etc.). Essa validação existe pra pegar alucinação ou erro de
+   formatação da IA o mais cedo possível. Em seguida, o Python **converte** os campos
+   específicos do idioma para um **schema unificado** (`CardResponse`) e enriquece cada card
+   com imagem e áudio. **Importante:** o Python não precisa (e não deve) saber nada sobre
+   tabelas, colunas ou nomes de Entities do banco. Ele só conhece o contrato JSON combinado,
+   nada de schema do Postgres — isso mantém os dois módulos desacoplados (se uma migration do
+   Flyway mudar amanhã, o Python nem fica sabendo).
 
 2. **Java (camada 2 — isso pode virar linha no banco?):** o Java recebe esse JSON já
    estruturado, mas **não confia nele às cegas** só porque veio validado do outro lado. Ele
@@ -380,7 +358,9 @@ Quem insere no banco, de fato, é sempre o Java — isso não é negociável, j�
 
 ### Quem chama quem
 O fluxo é sempre disparado pelo Java, nunca o contrário — o `python-services` não deve ser
-acessível diretamente pelo Frontend:
+acessível diretamente pelo Frontend. O `llm_agent.py` suporta dois modos de operação:
+- **`mode="topic"`** (usado pelo `/generate`): recebe um tópico livre e gera flashcards sobre ele
+- **`mode="words"`** (legado, usado pelo pipeline offline de `.apkg`): recebe palavras separadas por vírgula
 
 ```mermaid
 sequenceDiagram
@@ -388,18 +368,64 @@ sequenceDiagram
     participant J as Backend (Spring Boot)
     participant P as python-services (FastAPI)
     participant L as LLM (OpenAI)
+    participant M as Pexels / Edge-TTS
     participant DB as PostgreSQL
 
     C->>J: POST /decks/generate (JWT com ROLE_ADMIN)
     J->>P: chama o serviço de geração (rede interna do Compose)
-    P->>L: monta o prompt e envia
-    L-->>P: resposta em texto/JSON cru
-    P->>P: valida e molda a resposta (Pydantic)
-    P-->>J: JSON já estruturado, no contrato combinado
+    P->>L: monta o prompt com modelo específico do idioma
+    L-->>P: flashcards no schema do idioma (ex: MandarinFlashcard)
+    P->>P: converte para schema unificado + busca termo de imagem
+    P->>M: baixa imagem representativa (Pexels)
+    P->>M: gera áudio da palavra e da frase (Edge-TTS)
+    P->>P: serve mídia temporariamente via StaticFiles
+    P-->>J: JSON unificado com campos de texto + URLs de mídia
+    J->>M: baixa bytes de cada URL de mídia
     J->>J: valida de novo via DTO (Bean Validation)
-    J->>DB: INSERT via JPA/Entities
+    J->>DB: INSERT com texto + bytes de mídia (bytea)
     J-->>C: Deck criado
 ```
+
+### Mapeamento de campos: schema unificado
+
+Os modelos Pydantic do `llm_agent.py` são **específicos por idioma**. O `/generate` mapeia
+cada um para o schema unificado `CardResponse`:
+
+| Campo unificado | Mandarim | Inglês | Francês | Japonês |
+|---|---|---|---|---|
+| `target_word` | `hanzi` | `palavra_en` | `palavra_fr` | `kanji` |
+| `phonetic_reading` | `pinyin` | `ipa_pronuncia` | `ipa_pronuncia` | `kana (romaji)` |
+| `native_translation` | `traducao_pt` | `traducao_pt` | `traducao_pt` | `traducao_pt` |
+| `part_of_speech` | `classe_gramatical` | `classe_gramatical` | `classe_gramatical` | `classe_gramatical` |
+| `target_sentence` | `frase_exemplo_hanzi` | `frase_exemplo_en` | `frase_exemplo_fr` | `frase_exemplo_jp` |
+| `sentence_phonetic` | `frase_exemplo_pinyin` | — | — | — |
+| `sentence_translation` | `frase_exemplo_traducao` | `frase_exemplo_traducao` | `frase_exemplo_traducao` | `frase_exemplo_traducao` |
+
+Apenas mandarim tem fonética no nível da frase (`sentence_phonetic`). Japonês combina
+kana e romaji como `"{kana} ({romaji})"`. O `termo_busca_imagem_en` e `tags`, gerados
+pelo LLM, são usados internamente pelo Python e **não** expostos na resposta.
+
+### Como a mídia é servida ao frontend
+
+O Java armazena imagens e áudios como `bytea` diretamente na tabela `flashcards`. O frontend
+nunca acessa o Python-service diretamente. Três endpoints específicos expõem a mídia:
+
+```
+GET /flashcards/{id}/image          → image_data (com image_mime_type)
+GET /flashcards/{id}/audio/word     → audio_word_data (audio/mpeg)
+GET /flashcards/{id}/audio/sentence → audio_sentence_data (audio/mpeg)
+```
+
+**Detalhes de implementação (Python):**
+- Diretório de mídia temporário com `tempfile.mkdtemp()` — descartado no restart do container
+- URLs absolutas construídas via `request.base_url` + caminho do arquivo
+- Falhas de Pexels/TTS por card não abortam a geração — o card é salvo sem mídia
+
+**Detalhes de implementação (Java):**
+- Falhas de download de mídia são não-fatais — loga warning e persiste o card sem os bytes
+- MIME type da imagem inferido da extensão da URL (.jpg/.jpeg/.png)
+- A migração Flyway é destrutiva: as colunas antigas `image_url`/`audio_word_url`/`audio_sentence_url` são removidas
+- Os endpoints de mídia injetam `FlashcardRepository` diretamente, sem passar pelo service layer (trade-off de camadas aceito para o POC)
 
 ### Reflexo no `SecurityConfigurations`
 A rota que dispara a geração é uma ação de ADMIN, então precisa de uma regra explícita,
@@ -408,15 +434,32 @@ seguindo o mesmo padrão das demais rotas já comentadas na classe:
 .requestMatchers(HttpMethod.POST, "/decks/generate").hasAuthority("ROLE_ADMIN")
 ```
 
+Os endpoints de mídia (`GET /flashcards/{id}/image`, `/audio/word`, `/audio/sentence`)
+devem ser públicos ou liberados para `ROLE_USER`, já que qualquer estudante precisa
+acessar imagens e áudios durante o estudo.
+
 > **NOTA — sobre a exposição do `python-services`:** hoje, em ambiente de teste, a porta 8000 do
 > `python-services` é publicada para o host (`ports: "8000:8000"`) só para facilitar validação
 > manual. Container-to-container dentro da rede do Compose **não precisa** dessa porta publicada
-> para se comunicar — `backend` já enxerga `python-services:8000` pelo nome do serviço. Antes de
-> qualquer deploy real, vale reavaliar se essa porta deve continuar exposta publicamente, já que
-> o `python-services` hoje não tem autenticação própria e depende inteiramente do Java já ter
-> barrado o acesso antes de chamá-lo.
+> para se comunicar — `backend` já enxerga `python-services:8000` pelo nome do serviço. Desde a
+> implementação do `INTERNAL_SECRET` (header `X-Internal-Token`), o endpoint `/generate` tem
+> autenticação própria, mas a porta ainda deve ser fechada em produção para eliminar a superfície
+> de ataque. O endpoint `/health` não tem auth por ser usado exclusivamente pelo Docker HEALTHCHECK
+> na rede interna do container.
+
+### ✅ Já aplicadas
+
+Os itens abaixo foram identificados como melhorias e já implementados:
+
+1. **Segredo compartilhado entre Java e Python** (header `X-Internal-Token`, validado a partir
+   do `INTERNAL_SECRET` em ambos os `.env` files). O endpoint `/generate` do python-services exige
+   esse token; o Java envia em toda chamada.
+2. **`.env`/`.env.example` próprio do python-services**, lido via `env_file` no Compose.
+3. **Rota `/health` dedicada** para o Docker HEALTHCHECK, sem auth, retornando `{"status": "ok"}`.
+   O HEALTHCHECK do Dockerfile foi atualizado para apontar para ela.
 
 ### Possíveis mudanças futuras (ainda não aplicadas)
+
 Os pontos abaixo são melhorias identificadas, mas propositalmente **não implementadas ainda** —
 ficam registradas aqui como próximos passos quando o projeto se aproximar de um deploy real:
 
@@ -427,14 +470,10 @@ ficam registradas aqui como próximos passos quando o projeto se aproximar de um
    esse mapeamento em prod fecha o acesso direto de qualquer pessoa de fora, sem quebrar nada
    entre os dois módulos.
 2. **Decidir como manter a conveniência de testar `localhost:8000` manualmente (Postman) sem
-   reabrir a porta em produção.** Como hoje só existe um `docker-compose.yml` (ver seção 1.1),
+   reabrir a porta em produção.** Como hoje só existe um `docker-compose.yml` (ver seção 1),
    isso não pode mais ser resolvido só com um segundo arquivo de override — a decisão de qual
    mecanismo usar (um compose específico de deploy, `profiles` do Compose, ou simplesmente uma
    regra de firewall/security group na infraestrutura de hospedagem) fica em aberto até o projeto
    se aproximar de um deploy real.
-3. **Adicionar um segredo compartilhado entre Java e Python** (ex: header `X-Internal-Token`,
-   validado a partir de uma env var que só os dois módulos conhecem) como camada extra de defesa.
-   Mesmo sem a porta exposta, isso protege contra: reexposição acidental da porta no futuro, ou o
-   projeto crescer e outro serviço não relacionado acabar entrando na mesma rede Docker.
 
 ---

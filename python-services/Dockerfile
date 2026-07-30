@@ -52,10 +52,8 @@ EXPOSE 8000
 # Verifica se o container está saudável a cada 30 segundos.
 # Caso ocorram três falhas consecutivas, o container é marcado como 'unhealthy',
 # e o orquestrador pode reiniciá-lo ou tirar ele do load balancer.
-# Usa a rota "/" do main.py atual (retorna {"status": "AI Service running"}).
-# Se o serviço ganhar uma rota /health dedicada, é só trocar aqui.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" || exit 1
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # --host 0.0.0.0 é obrigatório: sem isso o Uvicorn só escuta em localhost
 # *dentro* do container, e o Docker não consegue rotear a porta pra fora.

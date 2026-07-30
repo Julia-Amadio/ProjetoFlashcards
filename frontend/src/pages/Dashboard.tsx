@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { PageState } from '../components/PageState'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
-import { readStorage, writeStorage } from '../lib/storage'
 import type { DeckSummary } from '../types'
 
 export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path: string) => void; favoritesOnly?: boolean }) {
@@ -14,15 +13,9 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
-  const favoritesKey = `karta.favorites.${session?.email ?? 'guest'}`
-  const [favorites, setFavorites] = useState<number[]>(() => {
-    try {
-      const saved = JSON.parse(readStorage(favoritesKey) || '[]')
-      return Array.isArray(saved) ? saved.filter(value => typeof value === 'number') : []
-    } catch {
-      return []
-    }
-  })
+  const [favorites, setFavorites] = useState<number[]>([])
+  const [favoritesPending, setFavoritesPending] = useState<number[]>([])
+  const [progressByDeck, setProgressByDeck] = useState<Record<number, number>>({})
   const name = session?.user?.name || session?.email.split('@')[0] || 'Estudante'
   const currentDate = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toLocaleUpperCase('pt-BR')
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR')
@@ -50,12 +43,68 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
     return () => controller.abort()
   }, [reloadKey, session?.token])
 
-  function toggleFavorite(deckId: number) {
-    setFavorites(current => {
-      const next = current.includes(deckId) ? current.filter(id => id !== deckId) : [...current, deckId]
-      writeStorage(favoritesKey, JSON.stringify(next))
-      return next
+  useEffect(() => {
+    if (!session?.token || !session.user?.id) return
+    const controller = new AbortController()
+    api.getFavorites(session.user.id, session.token, controller.signal)
+      .then(response => setFavorites(Array.isArray(response) ? response.map(deck => deck.id) : []))
+      .catch(err => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        // Lista de favoritos não é crítica pro resto da tela: falha aqui não trava o dashboard.
+      })
+    return () => controller.abort()
+  }, [reloadKey, session?.token, session?.user?.id])
+
+  // Calcula o % de progresso de cada deck (usado só pra mostrar a barrinha nos cards).
+  // Não bloqueia o carregamento da biblioteca: os cards aparecem primeiro, e a barra de
+  // progresso preenche assim que cada deck resolve — por isso fica num efeito separado.
+  useEffect(() => {
+    if (!session?.token || !session.user?.id || !decks.length) return
+    const controller = new AbortController()
+    const token = session.token
+    const userId = session.user.id
+
+    Promise.all(decks.map(deck =>
+      Promise.all([
+        api.listFlashcards(deck.id, token, controller.signal),
+        api.getStudyProgress(userId, deck.id, token, controller.signal),
+      ])
+        .then(([flashcards, progress]): [number, number] => {
+          const total = flashcards.length
+          if (!total) return [deck.id, 0]
+          const answered = progress.completed
+            ? total
+            : Math.min(progress.results.again + progress.results.almost + progress.results.easy, total)
+          return [deck.id, Math.round((answered / total) * 100)]
+        })
+        .catch((): [number, number] => [deck.id, 0]),
+    )).then(entries => {
+      if (controller.signal.aborted) return
+      setProgressByDeck(Object.fromEntries(entries))
     })
+
+    return () => controller.abort()
+  }, [decks, session?.token, session?.user?.id])
+
+  async function toggleFavorite(deckId: number) {
+    if (!session?.token || !session.user?.id) return
+    const token = session.token
+    const userId = session.user.id
+    const isFavorite = favorites.includes(deckId)
+    setFavoritesPending(current => [...current, deckId])
+    try {
+      if (isFavorite) {
+        await api.removeFavorite(userId, deckId, token)
+        setFavorites(current => current.filter(id => id !== deckId))
+      } else {
+        await api.addFavorite(userId, deckId, token)
+        setFavorites(current => [...current, deckId])
+      }
+    } catch {
+      // Não foi possível concluir a solicitação: mantém o estado anterior do favorito.
+    } finally {
+      setFavoritesPending(current => current.filter(id => id !== deckId))
+    }
   }
 
   return <div className="page-wrap">
@@ -73,14 +122,24 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
             <div className="deck-grid">
               {filtered.map(deck => {
                 const accent = deckAccent(deck.id)
+                const progress = progressByDeck[deck.id]
                 return <article className="deck-card" key={deck.id}>
-                  <div className="deck-visual" style={{ background: accent }}><span>{deckSymbol(deck.language)}</span><button className={favorites.includes(deck.id) ? 'favorited' : ''} onClick={() => toggleFavorite(deck.id)} aria-label={favorites.includes(deck.id) ? `Remover ${deck.title} dos favoritos neste dispositivo` : `Adicionar ${deck.title} aos favoritos neste dispositivo`} aria-pressed={favorites.includes(deck.id)}><Heart /></button></div>
-                  <div className="deck-body"><div className="deck-meta"><span>{deck.language}</span>{deck.difficultyLevel && <><i />{deck.difficultyLevel}</>}</div><h3>{deck.title}</h3><p>Pratique o conteúdo deste deck em uma sessão rápida de revisão.</p><button className="text-button" onClick={() => navigate(`/study/${deck.id}`)}>Começar deck</button></div>
+                  <div className="deck-visual" style={{ background: accent }}><span>{deckSymbol(deck.language)}</span><button className={favorites.includes(deck.id) ? 'favorited' : ''} onClick={() => toggleFavorite(deck.id)} disabled={favoritesPending.includes(deck.id)} aria-label={favorites.includes(deck.id) ? `Remover ${deck.title} dos favoritos` : `Adicionar ${deck.title} aos favoritos`} aria-pressed={favorites.includes(deck.id)}><Heart /></button></div>
+                  <div className="deck-body">
+                    <div className="deck-meta"><span>{deck.language}</span>{deck.difficultyLevel && <><i />{deck.difficultyLevel}</>}</div>
+                    <h3>{deck.title}</h3>
+                    <p>Pratique o conteúdo deste deck em uma sessão rápida de revisão.</p>
+                    {progress !== undefined && <>
+                      <div className="progress-label"><span>Progresso</span><b>{progress}%</b></div>
+                      <div className="progress-track"><i style={{ width: `${progress}%`, background: accent }} /></div>
+                    </>}
+                    <button className="text-button" onClick={() => navigate(`/study/${deck.id}`)}>Começar deck</button>
+                  </div>
                 </article>
               })}
             </div>
-            {!filtered.length && <PageState kind="empty" icon={Heart} title="Nenhum deck por aqui ainda" description={favoritesOnly ? 'Favorite um deck na biblioteca para encontrá-lo aqui neste dispositivo.' : 'Tente outra busca ou remova o filtro de dificuldade.'} />}
-            <div className="demo-note">Favoritos e preferências ficam salvos apenas neste dispositivo.</div>
+            {!filtered.length && <PageState kind="empty" icon={Heart} title="Nenhum deck por aqui ainda" description={favoritesOnly ? 'Favorite um deck na biblioteca para encontrá-lo aqui.' : 'Tente outra busca ou remova o filtro de dificuldade.'} />}
+            <div className="demo-note">Favoritos, preferências e progresso de estudo ficam salvos na sua conta.</div>
           </>}
     </section>
   </div>

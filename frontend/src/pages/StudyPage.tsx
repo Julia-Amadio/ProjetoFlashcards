@@ -2,31 +2,125 @@ import { ArrowLeft, CheckCircle2, RotateCcw, Volume2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { PageState } from '../components/PageState'
 import { useAuth } from '../context/AuthContext'
-import { sampleCardsByDeck, sampleDecks } from '../data/decks'
-import { loadPreferences } from '../lib/preferences'
-import { loadStudyProgress, saveStudyProgress, type StudyResults } from '../lib/studyProgress'
-import type { Deck, Flashcard } from '../types'
+import { api } from '../lib/api'
+import { defaultPreferences, loadPreferences, type StudyPreferences } from '../lib/preferences'
+import { emptyStudyProgress, loadStudyProgress, saveStudyProgress, type StudyProgress, type StudyResults } from '../lib/studyProgress'
+import type { ApiFlashcard, Flashcard } from '../types'
 
 type Rating = 'again' | 'almost' | 'easy'
+type LoadState = 'loading' | 'ready' | 'empty' | 'error'
+type StudyDeck = { id: number; title: string; accent: string; speechLanguage: string }
 const emptyResults: StudyResults = { again: 0, almost: 0, easy: 0 }
+
+// Cores e locais de fala não existem no backend — são só apresentação, então derivamos
+// localmente a partir do id/idioma do deck (mesma paleta usada no grid do Dashboard).
+const deckColors = ['#ee725d', '#6c8ed7', '#e8ae45', '#598876', '#9a78bd']
+function deckAccent(id: number) {
+  return deckColors[Math.abs(id) % deckColors.length]
+}
+
+const speechLocaleByLanguage: Record<string, string> = {
+  mandarim: 'zh-CN', chinês: 'zh-CN', inglês: 'en-US', espanhol: 'es-ES',
+  alemão: 'de-DE', francês: 'fr-FR', italiano: 'it-IT', japonês: 'ja-JP', coreano: 'ko-KR',
+}
+function speechLocaleFor(language: string) {
+  return speechLocaleByLanguage[language.trim().toLocaleLowerCase('pt-BR')] || 'en-US'
+}
+
+function toFlashcard(card: ApiFlashcard): Flashcard {
+  return {
+    word: card.targetWord,
+    phonetic: card.phoneticReading ?? '',
+    translation: card.nativeTranslation,
+    sentence: card.targetSentence ?? '',
+    sentenceTranslation: card.sentenceTranslation ?? '',
+  }
+}
 
 export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (path: string) => void }) {
   const { session } = useAuth()
-  const deck = sampleDecks.find(item => item.id === deckId)
-  const cards = sampleCardsByDeck[deckId]
+  const [state, setState] = useState<LoadState>('loading')
+  const [deck, setDeck] = useState<StudyDeck | null>(null)
+  const [cards, setCards] = useState<Flashcard[]>([])
+  const [initialProgress, setInitialProgress] = useState<StudyProgress>(emptyStudyProgress)
+  const [preferences, setPreferences] = useState<StudyPreferences>(defaultPreferences)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  if (!deck || !cards?.length) {
+  useEffect(() => {
+    if (!session?.token || !session.user?.id) return
+    const controller = new AbortController()
+    const { token } = session
+    const userId = session.user.id
+    setState('loading')
+
+    Promise.all([
+      api.getDeck(deckId, token, controller.signal),
+      api.listFlashcards(deckId, token, controller.signal),
+      loadStudyProgress(userId, deckId, token, controller.signal),
+      loadPreferences(userId, token, controller.signal),
+    ])
+      .then(([deckSummary, flashcards, progress, prefs]) => {
+        setDeck({
+          id: deckSummary.id,
+          title: deckSummary.title,
+          accent: deckAccent(deckSummary.id),
+          speechLanguage: speechLocaleFor(deckSummary.language),
+        })
+        setCards(flashcards.map(toFlashcard))
+        setInitialProgress({
+          ...progress,
+          index: Math.min(Math.max(progress.index, 0), Math.max(flashcards.length - 1, 0)),
+        })
+        setPreferences(prefs)
+        setState(flashcards.length ? 'ready' : 'empty')
+      })
+      .catch(err => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        setErrorMessage(err instanceof Error ? err.message : 'Não foi possível carregar este deck.')
+        setState('error')
+      })
+
+    return () => controller.abort()
+  }, [deckId, session?.token, session?.user?.id])
+
+  if (state === 'loading') {
     return <main className="study-page study-not-found">
-      <PageState kind="error" title="Este estudo não está disponível" description="Volte à biblioteca para escolher um dos decks disponíveis." action={<button className="primary-button" onClick={() => navigate('/')}><ArrowLeft /> Voltar à biblioteca</button>} />
+      <PageState kind="loading" title="Carregando deck" description="Buscando os cartões deste deck no servidor." />
     </main>
   }
 
-  return <StudySession deck={deck} cards={cards} email={session?.email ?? 'guest'} navigate={navigate} />
+  if (state === 'empty' && deck) {
+    return <main className="study-page study-not-found">
+      <PageState kind="empty" title={`"${deck.title}" ainda não tem flashcards`} description="Este deck existe, mas ainda não tem cartões cadastrados." action={<button className="primary-button" onClick={() => navigate('/')}><ArrowLeft /> Voltar à biblioteca</button>} />
+    </main>
+  }
+
+  if (state !== 'ready' || !deck || !session?.token || !session.user?.id) {
+    return <main className="study-page study-not-found">
+      <PageState kind="error" title="Este estudo não está disponível" description={errorMessage || 'Volte à biblioteca para escolher um dos decks disponíveis.'} action={<button className="primary-button" onClick={() => navigate('/')}><ArrowLeft /> Voltar à biblioteca</button>} />
+    </main>
+  }
+
+  return <StudySession
+    deck={deck}
+    cards={cards}
+    userId={session.user.id}
+    token={session.token}
+    initialProgress={initialProgress}
+    preferences={preferences}
+    navigate={navigate}
+  />
 }
 
-function StudySession({ deck, cards, email, navigate }: { deck: Deck; cards: Flashcard[]; email: string; navigate: (path: string) => void }) {
-  const initialProgress = useState(() => loadStudyProgress(email, deck.id, cards.length))[0]
-  const preferences = useState(() => loadPreferences(email))[0]
+function StudySession({ deck, cards, userId, token, initialProgress, preferences, navigate }: {
+  deck: StudyDeck
+  cards: Flashcard[]
+  userId: string
+  token: string
+  initialProgress: StudyProgress
+  preferences: StudyPreferences
+  navigate: (path: string) => void
+}) {
   const [index, setIndex] = useState(initialProgress.index)
   const [revealed, setRevealed] = useState(initialProgress.revealed)
   const [completed, setCompleted] = useState(initialProgress.completed)
@@ -73,8 +167,8 @@ function StudySession({ deck, cards, email, navigate }: { deck: Deck; cards: Fla
       readyToPersist.current = true
       return
     }
-    saveStudyProgress(email, deck.id, { index, revealed, completed, results })
-  }, [completed, deck.id, email, index, results, revealed])
+    saveStudyProgress(userId, deck.id, token, { index, revealed, completed, results })
+  }, [completed, deck.id, index, results, revealed, token, userId])
 
   useEffect(() => {
     if (preferences.autoplayAudio && !completed) speak()
