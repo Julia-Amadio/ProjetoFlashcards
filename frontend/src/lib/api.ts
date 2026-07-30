@@ -117,6 +117,16 @@ export const api = {
   getDeck: (id: number, token: string, signal?: AbortSignal) =>
     request<DeckSummary>(`/decks/${id}`, { signal }, token),
 
+  generateDeck: (
+    token: string,
+    data: { topic: string; language: string; difficultyLevel?: string },
+  ) =>
+    request<DeckSummary>(
+      '/decks/generate',
+      { method: 'POST', body: JSON.stringify(data) },
+      token,
+    ),
+
   listFlashcards: (deckId: number, token: string, signal?: AbortSignal) =>
     request<ApiFlashcard[]>(`/decks/${deckId}/flashcards`, { signal }, token),
 

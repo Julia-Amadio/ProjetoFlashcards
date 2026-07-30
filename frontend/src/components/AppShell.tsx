@@ -1,4 +1,4 @@
-import { BookOpen, Compass, Heart, LogOut, Menu, Settings, Sparkles, X } from 'lucide-react'
+import { BookOpen, Compass, Heart, LogOut, Menu, Settings, Sparkles, WandSparkles, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Logo } from './Logo'
@@ -14,6 +14,9 @@ export function AppShell({ children, page, navigate }: Props) {
     { id: 'home', path: '/', label: 'Visão geral', icon: Compass },
     { id: 'study', path: '/study/1', label: 'Estudar agora', icon: BookOpen },
     { id: 'favorites', path: '/favorites', label: 'Favoritos', icon: Heart },
+    ...(session?.user?.role === 'ROLE_ADMIN'
+      ? [{ id: 'generate', path: '/admin/generate', label: 'Gerar com IA', icon: WandSparkles }]
+      : []),
   ]
 
   const go = (path: string) => { navigate(path); setOpen(false) }
