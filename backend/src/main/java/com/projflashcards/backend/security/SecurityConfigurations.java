@@ -36,6 +36,9 @@ public class SecurityConfigurations {
 					//Swagger/OpenAPI — acessível sem token em dev
 					.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
+					//Health check para a plataforma de deploy (Render/Railway/Fly.io)
+					.requestMatchers(HttpMethod.GET, "/health").permitAll()
+
 					//Rotas administrativas — apenas usuários com ROLE_ADMIN
 					.requestMatchers(HttpMethod.GET, "/users").hasAuthority("ROLE_ADMIN")
 					//"/users/*" (um segmento só) para não capturar "/users/{id}/favorites/{deckId}",
