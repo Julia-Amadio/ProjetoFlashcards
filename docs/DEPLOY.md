@@ -115,6 +115,30 @@ compose já mapeia a mesma porta dos dois lados.
 * Testado localmente (`docker compose up --build`) depois da mudança: os dois continuam subindo
   normalmente em 8080/8000 (sem `PORT` definida, cai no default de sempre) — nada quebrou pra
   quem só usa Docker Compose local.
+* **Confirmado em produção:** o backend subiu no Render na porta `10000` (não 8080) — prova de
+  que o Render atribui `PORT` dinamicamente de verdade, e que o fix estava certo.
+
+### `GET /health` — rota dedicada pros dois serviços
+
+Adicionada rota `/health` no backend (`HealthController`, `permitAll` no
+`SecurityConfigurations`), no mesmo padrão do `python-services`. Usar `/health` no campo "Health
+Check Path" do Render pros dois serviços.
+
+### Notas reais do deploy no Render (o que aconteceu de fato)
+
+* **`Dockerfile Path` no Render precisa do nome do arquivo, não só a pasta.** O campo "Docker
+  Build Context Directory" aceita só a pasta (`python-services/`), mas "Dockerfile Path" precisa
+  do caminho completo até o arquivo: `python-services/Dockerfile`. Só colocar a pasta não funciona.
+* **Deixar "Docker Command" em branco nos dois serviços** — não sobrescreve o `CMD`/`ENTRYPOINT`
+  de cada Dockerfile, que já foram ajustados pra porta dinâmica.
+* **Um `Not Found` passageiro logo após "Your service is live" é normal.** Bateu isso testando o
+  `/health` do backend segundos depois do deploy terminar — foi só o proxy de borda do Render/
+  Cloudflare ainda propagando; tentar de novo alguns segundos depois resolveu sozinho. Não
+  indica commit errado nem rota faltando (confirme pelo hash do commit na aba "Events" do Render
+  antes de suspeitar de código).
+* Os `WARN` de `spring.jpa.open-in-view` e do Springdoc (`/v3/api-docs`, `/swagger-ui.html`) que
+  aparecem no log de boot são só avisos informativos padrão do Spring Boot — não é erro, não
+  bloqueia o deploy.
 
 ---
 
@@ -122,9 +146,16 @@ compose já mapeia a mesma porta dos dois lados.
 
 - [x] Trocar o `CMD` do `python-services/Dockerfile` para *shell form* com `${PORT:-8000}`.
 - [x] Adicionar `server.port=${PORT:8080}` no `application.properties` do backend.
-- [ ] Deploy do `python-services` no Render → anotar URL pública.
-- [ ] Deploy do `backend` no Render, com `PYTHON_SERVICE_URL` apontando pra URL acima, e
-  `backend/.env` (Neon) configurado nas env vars da plataforma → anotar URL pública.
+- [x] Adicionar `GET /health` (sem auth) nos dois serviços.
+- [x] Deploy do `python-services` no Render → `https://karta-python-services.onrender.com`
+  (confirmado: `/health` e `/` respondem, `/generate` sem `INTERNAL_SECRET` dá `401`).
+- [x] Deploy do `backend` no Render → `https://projetoflashcards.onrender.com`
+  (confirmado: `/health` responde, Flyway validou as 8 migrations contra o Neon).
+- [x] **Confirmar que `PYTHON_SERVICE_URL` nas env vars do backend no Render aponta pra URL real
+  do `python-services`** (`https://karta-python-services.onrender.com`) — o default
+  (`http://python-services:8000`, nome interno do Compose) não existe fora do Docker local; sem
+  isso configurado certinho, `POST /decks/generate` falha em produção mesmo com os dois serviços
+  no ar.
 - [ ] Testar via `docs/API_CHEATSHEET.md` direto nas URLs públicas (login, decks, geração via IA)
   — não depende do front nem de CORS.
 - [ ] Adicionar configuração de CORS no `SecurityConfigurations` liberando o domínio do front —
