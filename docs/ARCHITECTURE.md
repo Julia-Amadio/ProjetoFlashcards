@@ -135,27 +135,30 @@ manualmente.
 
 ### O que já conversa com o backend
 * `POST /users`: cadastro;
-* `POST /login`: login e obtenção do JWT;
-* `GET /decks`: catálogo exibido no dashboard.
+* `POST /login`: login e obtenção do JWT (mais os dados do usuário, incluindo o `id`);
+* `GET /decks`, `GET /decks/{id}`: catálogo exibido no dashboard;
+* `GET /decks/{deckId}/flashcards`: cards reais usados na tela `/study/{id}` (nada de dados
+  estáticos — `frontend/src/data/decks.ts` não é mais a fonte usada aqui);
+* `GET`/`POST`/`DELETE /users/{userId}/favorites`: favoritos;
+* `GET`/`PUT /users/{userId}/study-progress/{deckId}`: progresso de revisão;
+* `GET`/`PUT /users/{userId}/preferences`: preferências do usuário.
 
 O cliente usa `/api` por padrão. Durante o desenvolvimento, o proxy do Vite remove esse prefixo
 e encaminha a requisição para `http://localhost:8080`. Em outro ambiente,
-`VITE_API_URL` substitui a URL base.
+`VITE_API_URL` substitui a URL base — precisa ser a URL pública completa em build de produção
+(ver `docs/DEPLOY.md`).
 
-### O que ainda é local/demonstrativo
-* `frontend/src/data/decks.ts` contém os decks e cartões usados pela tela `/study/{id}`;
-* favoritos da interface ficam em `karta.favorites.{email}`;
-* preferências ficam em `karta.preferences.{email}`;
-* progresso de cada deck fica em `karta.study.{email}.{deckId}`;
-* a sessão JWT fica em `karta.session`.
+### O que ainda falta (só isso, ver `docs/TODO.md` para detalhes)
+* Ação de admin para gerar deck via IA (`POST /decks/generate`) — o backend já suporta, a
+  interface não chama;
+* Telas de admin para CRUD de decks/flashcards — mesma situação;
+* Renderizar imagem e áudio dos flashcards (`GET /flashcards/{id}/image`, `.../audio/word`,
+  `.../audio/sentence`) — endpoints prontos, nenhum componente os usa ainda.
 
-Isso cria uma diferença importante: o dashboard lista qualquer deck existente no PostgreSQL,
-mas a tela de estudo só reconhece os IDs `1`, `2` e `3` definidos nos dados demonstrativos. Os
-endpoints de favoritos do backend existem, porém o frontend ainda não os chama.
-
-O JWT é lido no navegador para verificar a claim `exp`. Ao expirar — ou quando uma chamada
-autenticada devolve `401` — a sessão local é removida e a tela de login informa que é necessário
-entrar novamente.
+A sessão JWT continua persistida localmente (`karta.session`, em `localStorage`) — isso é
+esperado, não é um gap: o JWT é lido no navegador para verificar a claim `exp`, e ao expirar (ou
+quando uma chamada autenticada devolve `401`) a sessão local é removida e a tela de login informa
+que é necessário entrar novamente.
 
 ---
 
