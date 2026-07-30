@@ -18,6 +18,7 @@ ProjetoFlashcards/
 │   │   └── triage-labels.md
 │   ├── ARCHITECTURE.md       # este arquivo
 │   ├── API_CHEATSHEET.md     # exemplos de requisição (cURL + Postman) para as rotas já existentes
+│   ├── DEPLOY.md             # plano e decisões para uma tentativa de deploy (opcional)
 │   └── TODO.md               # checklist do que falta implementar, por módulo
 ├── .scratch/                 # issues e specs locais (markdown)
 ├── docker-compose.yml        # orquestra backend + python-services, único cenário de execução
@@ -45,7 +46,7 @@ O projeto utiliza uma arquitetura de **Sistema Distribuído**, projetada para se
 responsabilidades e otimizar recursos. Ela é dividida em três frentes principais:
 
 - **Frontend (React):** interface do usuário onde o estudante cria a conta, consulta o catálogo
-de decks e pratica os cartões demonstrativos.
+de decks e pratica os cartões reais (persistidos no backend, ver seção 4).
 - **Backend principal (Spring Boot):** o "cérebro" monolítico do negócio. Gerencia 
 de forma centralizada os usuários, segurança (JWT), progresso de aprendizado e persiste 
 os dados no banco PostgreSQL.
@@ -57,8 +58,8 @@ temporárias de mídia; o Java faz o download dos bytes e persiste tudo no Postg
 (ver ADR-0001). Isola a complexidade das APIs externas do backend principal.
 
 Essa separação também evita que uma indisponibilidade da OpenAI/Pexels derrube autenticação,
-catálogo ou favoritos. Hoje essa independência é ainda mais direta: o backend depende do container
-Python estar iniciado, mas nenhuma rota Java implementada chama o serviço de IA.
+catálogo ou favoritos: só `POST /decks/generate` (ver seção 7) chama o `python-services`; todo o
+resto do backend funciona normalmente mesmo que a IA esteja fora do ar.
 
 ### Execução: um único cenário, sempre contra o Neon
 Todo o sistema sobe por um único `docker-compose.yml`, apontando sempre pro banco na nuvem (Neon) —
@@ -119,8 +120,10 @@ retornando um erro amigável antes mesmo de tentar salvar no banco.
   - `GET /health` — liveness check, sem auth, retorna `{"status": "ok"}`
   - `GET /` — rota genérica, retorna `{"status": "AI Service running"}`
   - `POST /generate` — geração de flashcards, protegida por `INTERNAL_SECRET`
-- **OpenAI SDK:** para integração com o GPT-4o-mini (fallback) e o modelo `gpt-5` via 
-  `client.beta.chat.completions.parse` com resposta estruturada por idioma.
+- **OpenAI SDK:** para integração com o modelo `gpt-5` via `client.beta.chat.completions.parse`,
+  com resposta estruturada por idioma. Sem `OPENAI_API_KEY` configurada, `/generate` não chama
+  LLM nenhum — devolve um `MOCK_RESPONSE` fixo (cards de exemplo em inglês, sem mídia), só pra
+  permitir testar a integração Java↔Python↔banco sem gastar créditos.
 - **Edge-TTS:** para gerar áudios com vozes neurais realistas sem custo.
 - **Pydantic:** usado em duas camadas — models específicos por idioma (`llm_agent.py`) e 
   schema unificado de resposta (`main.py`).
@@ -186,9 +189,15 @@ Onde reside a verdade sobre as regras de negócio de cada entidade em particular
 * `DeckService`:
     * Usa o usuário autenticado como autor ao criar um deck;
     * Lista/busca decks e os converte para `DeckSummaryDTO`.
+* `FlashcardService`: CRUD de flashcards de um deck, convertendo para `FlashcardDTO` (sem os
+  campos de mídia — esses são servidos por rotas dedicadas direto no `FlashcardController`).
+* `GenerateService`: orquestra a chamada ao `python-services` (ver seção 7), baixa a mídia
+  retornada e persiste deck + flashcards numa única transação.
 * `UserFavoriteService`:
     * Valida se o usuário autenticado é dono do recurso ou administrador;
     * Gerencia a relação muitos-para-muitos persistida em `user_favorite_decks`.
+* `StudyProgressService` / `UserPreferencesService`: persistem progresso de revisão e
+  preferências por usuário, substituindo o que antes vivia só no `localStorage` do frontend.
 
 ### 📂 `com.projflashcards.backend.security`
 Este é o pacote "transversal" do sistema. Ele não lida com regras de negócio de flashcards,
@@ -437,9 +446,10 @@ seguindo o mesmo padrão das demais rotas já comentadas na classe:
 .requestMatchers(HttpMethod.POST, "/decks/generate").hasAuthority("ROLE_ADMIN")
 ```
 
-Os endpoints de mídia (`GET /flashcards/{id}/image`, `/audio/word`, `/audio/sentence`)
-devem ser públicos ou liberados para `ROLE_USER`, já que qualquer estudante precisa
-acessar imagens e áudios durante o estudo.
+Os endpoints de mídia (`GET /flashcards/{id}/image`, `/audio/word`, `/audio/sentence`) não têm
+regra explícita no `SecurityConfigurations` — caem no `.anyRequest().authenticated()` do final da
+cadeia, ou seja, já são acessíveis a qualquer usuário autenticado (`ROLE_USER` incluso), o que é
+o comportamento correto: qualquer estudante precisa acessar imagem e áudio durante o estudo.
 
 > **NOTA — sobre a exposição do `python-services`:** hoje, em ambiente de teste, a porta 8000 do
 > `python-services` é publicada para o host (`ports: "8000:8000"`) só para facilitar validação
