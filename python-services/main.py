@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
-import openai
 import os
 from dotenv import load_dotenv
+from modulos.llm_agent import gerar_flashcards_json
 
 load_dotenv()
 
@@ -22,31 +22,60 @@ class CardResponse(BaseModel):
     target_sentence: Optional[str] = None
     sentence_phonetic: Optional[str] = None
     sentence_translation: Optional[str] = None
+    image_url: Optional[str] = None
+    audio_word_url: Optional[str] = None
+    audio_sentence_url: Optional[str] = None
 
 class GenerateResponse(BaseModel):
     deck_title: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
     cards: List[CardResponse] = Field(..., min_length=1)
 
-SYSTEM_PROMPT = """You are a language learning assistant. Given a topic and language, generate a set of flashcards.
-Each card must contain: target word, phonetic reading (if applicable), native translation, part of speech,
-a sentence example, sentence phonetic (if applicable), and sentence translation.
-Return ONLY valid JSON in the following format, no markdown, no code fences:
-{
-  "deck_title": "Topic Name",
-  "description": "Brief description",
-  "cards": [
-    {
-      "target_word": "word",
-      "phonetic_reading": "pronunciation",
-      "native_translation": "translation",
-      "part_of_speech": "noun/verb/etc",
-      "target_sentence": "example sentence",
-      "sentence_phonetic": "sentence pronunciation",
-      "sentence_translation": "sentence translation"
-    }
-  ]
-}"""
+
+def _map_card_to_unified(card: dict, language: str) -> CardResponse:
+    if language == "mandarin":
+        return CardResponse(
+            target_word=card["hanzi"],
+            phonetic_reading=card["pinyin"],
+            native_translation=card["traducao_pt"],
+            part_of_speech=card["classe_gramatical"],
+            target_sentence=card["frase_exemplo_hanzi"],
+            sentence_phonetic=card["frase_exemplo_pinyin"],
+            sentence_translation=card["frase_exemplo_traducao"],
+        )
+    elif language == "english":
+        return CardResponse(
+            target_word=card["palavra_en"],
+            phonetic_reading=card["ipa_pronuncia"],
+            native_translation=card["traducao_pt"],
+            part_of_speech=card["classe_gramatical"],
+            target_sentence=card["frase_exemplo_en"],
+            sentence_phonetic=None,
+            sentence_translation=card["frase_exemplo_traducao"],
+        )
+    elif language == "french":
+        return CardResponse(
+            target_word=card["palavra_fr"],
+            phonetic_reading=card["ipa_pronuncia"],
+            native_translation=card["traducao_pt"],
+            part_of_speech=card["classe_gramatical"],
+            target_sentence=card["frase_exemplo_fr"],
+            sentence_phonetic=None,
+            sentence_translation=card["frase_exemplo_traducao"],
+        )
+    elif language == "japanese":
+        return CardResponse(
+            target_word=card["kanji"],
+            phonetic_reading=f"{card['kana']} ({card['romaji']})",
+            native_translation=card["traducao_pt"],
+            part_of_speech=card["classe_gramatical"],
+            target_sentence=card["frase_exemplo_jp"],
+            sentence_phonetic=None,
+            sentence_translation=card["frase_exemplo_traducao"],
+        )
+    else:
+        raise ValueError(f"Unsupported language: {language}")
+
 
 MOCK_RESPONSE = {
     "deck_title": "Basic Greetings",
@@ -59,7 +88,10 @@ MOCK_RESPONSE = {
             "part_of_speech": "interjection",
             "target_sentence": "Hello, how are you?",
             "sentence_phonetic": "/həˈloʊ, haʊ ɑːr juː/",
-            "sentence_translation": "Olá, como você está?"
+            "sentence_translation": "Olá, como você está?",
+            "image_url": None,
+            "audio_word_url": None,
+            "audio_sentence_url": None
         },
         {
             "target_word": "goodbye",
@@ -68,7 +100,10 @@ MOCK_RESPONSE = {
             "part_of_speech": "interjection",
             "target_sentence": "Goodbye, see you tomorrow!",
             "sentence_phonetic": "/ɡʊdˈbaɪ, siː juː təˈmɒroʊ/",
-            "sentence_translation": "Tchau, vejo você amanhã!"
+            "sentence_translation": "Tchau, vejo você amanhã!",
+            "image_url": None,
+            "audio_word_url": None,
+            "audio_sentence_url": None
         },
         {
             "target_word": "thank you",
@@ -77,7 +112,10 @@ MOCK_RESPONSE = {
             "part_of_speech": "phrase",
             "target_sentence": "Thank you for your help.",
             "sentence_phonetic": "/θæŋk juː fɔːr jɔːr hɛlp/",
-            "sentence_translation": "Obrigado pela sua ajuda."
+            "sentence_translation": "Obrigado pela sua ajuda.",
+            "image_url": None,
+            "audio_word_url": None,
+            "audio_sentence_url": None
         }
     ]
 }
@@ -92,21 +130,18 @@ def generate_cards(req: GenerateRequest):
     api_key = os.getenv("OPENAI_API_KEY")
     if api_key:
         try:
-            openai.api_key = api_key
-            response = openai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Generate flashcards about '{req.topic}' in {req.language} "
-                                                 f"at difficulty level {req.difficulty_level or 'beginner'}"}
-                ],
-                temperature=0.7,
-                response_format={"type": "json_object"}
+            card_dicts = gerar_flashcards_json(
+                req.topic,
+                language=req.language,
+                mode="topic",
+                difficulty_level=req.difficulty_level or ""
             )
-            raw = response.choices[0].message.content
-            import json
-            data = json.loads(raw)
-            return GenerateResponse(**data)
+            cards = [_map_card_to_unified(c, req.language) for c in card_dicts]
+            return GenerateResponse(
+                deck_title=req.topic,
+                description=f"Generated flashcards about {req.topic} in {req.language}",
+                cards=cards
+            )
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"LLM error: {str(e)}")
     else:
