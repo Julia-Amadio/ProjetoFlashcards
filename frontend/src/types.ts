@@ -19,6 +19,13 @@ export type DeckSummary = {
   difficultyLevel: string | null
 }
 
+// Corpo enviado para POST /decks/generate (DeckGenerateDTO no backend)
+export type DeckGenerateRequest = {
+  topic: string
+  language: string
+  difficultyLevel?: string
+}
+
 export type Deck = {
   id: number
   title: string

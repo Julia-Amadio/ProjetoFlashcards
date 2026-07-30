@@ -1,4 +1,4 @@
-import type { ApiFlashcard, ApiStudyProgress, ApiUserPreferences, DeckSummary, User } from '../types'
+import type { ApiFlashcard, ApiStudyProgress, ApiUserPreferences, DeckGenerateRequest, DeckSummary, User } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -84,6 +84,11 @@ export const api = {
 
   getDeck: (id: number, token: string, signal?: AbortSignal) =>
     request<DeckSummary>(`/decks/${id}`, { signal }, token),
+
+  // Dispara a geração via IA (ROLE_ADMIN). Pode levar alguns segundos: o backend só responde
+  // depois que o python-services gerou texto+mídia e o deck já foi persistido no banco.
+  generateDeck: (token: string, data: DeckGenerateRequest) =>
+    request<DeckSummary>('/decks/generate', { method: 'POST', body: JSON.stringify(data) }, token),
 
   listFlashcards: (deckId: number, token: string, signal?: AbortSignal) =>
     request<ApiFlashcard[]>(`/decks/${deckId}/flashcards`, { signal }, token),

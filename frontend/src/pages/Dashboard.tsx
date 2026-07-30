@@ -1,5 +1,6 @@
-import { BookOpen, Heart, RefreshCw, Search } from 'lucide-react'
+import { BookOpen, Heart, RefreshCw, Search, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { GenerateDeckModal } from '../components/GenerateDeckModal'
 import { PageState } from '../components/PageState'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
@@ -16,6 +17,8 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
   const [favorites, setFavorites] = useState<number[]>([])
   const [favoritesPending, setFavoritesPending] = useState<number[]>([])
   const [progressByDeck, setProgressByDeck] = useState<Record<number, number>>({})
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
+  const isAdmin = session?.user?.role === 'ROLE_ADMIN'
   const name = session?.user?.name || session?.email.split('@')[0] || 'Estudante'
   const currentDate = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()).toLocaleUpperCase('pt-BR')
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR')
@@ -110,8 +113,15 @@ export function Dashboard({ navigate, favoritesOnly = false }: { navigate: (path
   return <div className="page-wrap">
     <section className="welcome-row">
       <div><span className="eyebrow">{currentDate}</span><h1>{favoritesOnly ? 'Seus favoritos' : <>Olá, {name}. <em>Vamos aprender?</em></>}</h1><p>{favoritesOnly ? 'Os decks que você guardou para encontrar mais rápido.' : 'Seu próximo pequeno avanço começa agora.'}</p></div>
-      {!favoritesOnly && <button className="primary-button compact" onClick={() => navigate(`/study/${decks[0].id}`)} disabled={!decks.length}><BookOpen size={18} /> Estudar agora</button>}
+      {!favoritesOnly && <div className="welcome-actions">
+        {isAdmin && <button className="secondary-button" onClick={() => setShowGenerateModal(true)}><Sparkles size={18} /> Gerar deck com IA</button>}
+        <button className="primary-button compact" onClick={() => navigate(`/study/${decks[0].id}`)} disabled={!decks.length}><BookOpen size={18} /> Estudar agora</button>
+      </div>}
     </section>
+    {showGenerateModal && <GenerateDeckModal
+      onClose={() => setShowGenerateModal(false)}
+      onCreated={() => { setShowGenerateModal(false); setReloadKey(value => value + 1) }}
+    />}
     <section className="library-section">
       <div className="section-heading"><div><span className="eyebrow">SUA BIBLIOTECA</span><h2>{favoritesOnly ? 'Decks salvos' : 'Escolha seu próximo deck'}</h2></div><div className="search-row"><label className="search-box"><Search /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar por deck ou idioma" aria-label="Buscar por deck ou idioma" /></label><select className="filter-select" value={difficulty} onChange={event => setDifficulty(event.target.value)} aria-label="Filtrar por dificuldade"><option value="all">Todas as dificuldades</option>{difficulties.map(value => <option key={value} value={value}>{value}</option>)}</select></div></div>
       {loading
