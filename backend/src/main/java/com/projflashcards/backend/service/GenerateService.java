@@ -58,6 +58,9 @@ public class GenerateService {
                     c.nativeTranslation(), c.partOfSpeech(), c.targetSentence(),
                     c.sentencePhonetic(), c.sentenceTranslation()
             );
+            card.setImageUrl(c.imageUrl());
+            card.setAudioWordUrl(c.audioWordUrl());
+            card.setAudioSentenceUrl(c.audioSentenceUrl());
             return flashcardRepository.save(card);
         }).toList();
 

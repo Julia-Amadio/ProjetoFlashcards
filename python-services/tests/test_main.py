@@ -6,10 +6,14 @@ from main import app, _map_card_to_unified
 client = TestClient(app)
 
 
+@patch("main.baixar_imagem_para_arquivo")
+@patch("main.gerar_audio_local")
 @patch("main.os.getenv")
 @patch("main.gerar_flashcards_json")
-def test_generate_english(mock_gerar, mock_getenv):
+def test_generate_english(mock_gerar, mock_getenv, mock_audio, mock_imagem):
     mock_getenv.return_value = "sk-test-key"
+    mock_imagem.return_value = False
+    mock_audio.return_value = (None, None)
     mock_gerar.return_value = [
         {
             "id_unico": "CARD-01",
@@ -50,10 +54,14 @@ def test_generate_english(mock_gerar, mock_getenv):
     )
 
 
+@patch("main.baixar_imagem_para_arquivo")
+@patch("main.gerar_audio_local")
 @patch("main.os.getenv")
 @patch("main.gerar_flashcards_json")
-def test_generate_mandarin(mock_gerar, mock_getenv):
+def test_generate_mandarin(mock_gerar, mock_getenv, mock_audio, mock_imagem):
     mock_getenv.return_value = "sk-test-key"
+    mock_imagem.return_value = False
+    mock_audio.return_value = (None, None)
     mock_gerar.return_value = [
         {
             "id_unico": "CARD-01",
@@ -83,10 +91,14 @@ def test_generate_mandarin(mock_gerar, mock_getenv):
     assert card["image_url"] is None
 
 
+@patch("main.baixar_imagem_para_arquivo")
+@patch("main.gerar_audio_local")
 @patch("main.os.getenv")
 @patch("main.gerar_flashcards_json")
-def test_generate_french(mock_gerar, mock_getenv):
+def test_generate_french(mock_gerar, mock_getenv, mock_audio, mock_imagem):
     mock_getenv.return_value = "sk-test-key"
+    mock_imagem.return_value = False
+    mock_audio.return_value = (None, None)
     mock_gerar.return_value = [
         {
             "id_unico": "CARD-01",
@@ -113,10 +125,14 @@ def test_generate_french(mock_gerar, mock_getenv):
     assert card["sentence_phonetic"] is None
 
 
+@patch("main.baixar_imagem_para_arquivo")
+@patch("main.gerar_audio_local")
 @patch("main.os.getenv")
 @patch("main.gerar_flashcards_json")
-def test_generate_japanese(mock_gerar, mock_getenv):
+def test_generate_japanese(mock_gerar, mock_getenv, mock_audio, mock_imagem):
     mock_getenv.return_value = "sk-test-key"
+    mock_imagem.return_value = False
+    mock_audio.return_value = (None, None)
     mock_gerar.return_value = [
         {
             "id_unico": "CARD-01",
@@ -144,10 +160,14 @@ def test_generate_japanese(mock_gerar, mock_getenv):
     assert card["sentence_phonetic"] is None
 
 
+@patch("main.baixar_imagem_para_arquivo")
+@patch("main.gerar_audio_local")
 @patch("main.os.getenv")
 @patch("main.gerar_flashcards_json")
-def test_generate_llm_error(mock_gerar, mock_getenv):
+def test_generate_llm_error(mock_gerar, mock_getenv, mock_audio, mock_imagem):
     mock_getenv.return_value = "sk-test-key"
+    mock_imagem.return_value = False
+    mock_audio.return_value = (None, None)
     mock_gerar.side_effect = ValueError("OpenAI API error")
 
     response = client.post("/generate", json={
@@ -173,6 +193,150 @@ def test_generate_mock_fallback(mock_getenv):
     assert data["deck_title"] == "Basic Greetings"
     assert len(data["cards"]) == 3
     assert data["cards"][0]["image_url"] is None
+
+
+@patch("main.baixar_imagem_para_arquivo")
+@patch("main.gerar_audio_local")
+@patch("main.os.getenv")
+@patch("main.gerar_flashcards_json")
+def test_generate_with_media_success(mock_gerar, mock_getenv, mock_audio, mock_imagem):
+    mock_getenv.return_value = "sk-test-key"
+    mock_imagem.return_value = True
+    mock_audio.return_value = ("/tmp/media/abc.mp3", "abc.mp3")
+    mock_gerar.return_value = [
+        {
+            "id_unico": "CARD-01",
+            "palavra_en": "cat",
+            "ipa_pronuncia": "/kæt/",
+            "traducao_pt": "gato",
+            "classe_gramatical": "n.",
+            "frase_exemplo_en": "The cat sleeps",
+            "frase_exemplo_traducao": "O gato dorme",
+            "tags": "A1",
+            "termo_busca_imagem_en": "cat animal",
+        }
+    ]
+
+    response = client.post("/generate", json={
+        "topic": "Animals",
+        "language": "english",
+    })
+
+    assert response.status_code == 200
+    card = response.json()["cards"][0]
+    assert card["target_word"] == "cat"
+    assert card["image_url"] is not None
+    assert "media/" in card["image_url"]
+    assert card["image_url"].endswith(".jpg")
+    assert card["audio_word_url"] is not None
+    assert "media/" in card["audio_word_url"]
+    assert card["audio_word_url"].endswith(".mp3")
+    assert card["audio_sentence_url"] is not None
+    assert "media/" in card["audio_sentence_url"]
+    assert card["audio_sentence_url"].endswith(".mp3")
+
+
+@patch("main.baixar_imagem_para_arquivo")
+@patch("main.gerar_audio_local")
+@patch("main.os.getenv")
+@patch("main.gerar_flashcards_json")
+def test_generate_media_image_failure(mock_gerar, mock_getenv, mock_audio, mock_imagem):
+    mock_getenv.return_value = "sk-test-key"
+    mock_imagem.return_value = False
+    mock_audio.return_value = ("/tmp/media/abc.mp3", "abc.mp3")
+    mock_gerar.return_value = [
+        {
+            "id_unico": "CARD-01",
+            "palavra_en": "dog",
+            "ipa_pronuncia": "/dɔɡ/",
+            "traducao_pt": "cachorro",
+            "classe_gramatical": "n.",
+            "frase_exemplo_en": "The dog runs",
+            "frase_exemplo_traducao": "O cachorro corre",
+            "tags": "A1",
+            "termo_busca_imagem_en": "dog animal",
+        }
+    ]
+
+    response = client.post("/generate", json={
+        "topic": "Animals",
+        "language": "english",
+    })
+
+    assert response.status_code == 200
+    card = response.json()["cards"][0]
+    assert card["image_url"] is None
+    assert card["audio_word_url"] is not None
+    assert card["audio_sentence_url"] is not None
+
+
+@patch("main.baixar_imagem_para_arquivo")
+@patch("main.gerar_audio_local")
+@patch("main.os.getenv")
+@patch("main.gerar_flashcards_json")
+def test_generate_media_audio_failure(mock_gerar, mock_getenv, mock_audio, mock_imagem):
+    mock_getenv.return_value = "sk-test-key"
+    mock_imagem.return_value = True
+    mock_audio.return_value = (None, None)
+    mock_gerar.return_value = [
+        {
+            "id_unico": "CARD-01",
+            "palavra_en": "bird",
+            "ipa_pronuncia": "/bɜːrd/",
+            "traducao_pt": "pássaro",
+            "classe_gramatical": "n.",
+            "frase_exemplo_en": "The bird flies",
+            "frase_exemplo_traducao": "O pássaro voa",
+            "tags": "A1",
+            "termo_busca_imagem_en": "bird animal",
+        }
+    ]
+
+    response = client.post("/generate", json={
+        "topic": "Animals",
+        "language": "english",
+    })
+
+    assert response.status_code == 200
+    card = response.json()["cards"][0]
+    assert card["image_url"] is not None
+    assert card["audio_word_url"] is None
+    assert card["audio_sentence_url"] is None
+
+
+@patch("main.baixar_imagem_para_arquivo")
+@patch("main.gerar_audio_local")
+@patch("main.os.getenv")
+@patch("main.gerar_flashcards_json")
+def test_generate_media_termo_busca_fallback(mock_gerar, mock_getenv, mock_audio, mock_imagem):
+    mock_getenv.return_value = "sk-test-key"
+    mock_imagem.return_value = True
+    mock_audio.return_value = (None, None)
+    mock_gerar.return_value = [
+        {
+            "id_unico": "CARD-01",
+            "palavra_en": "fish",
+            "ipa_pronuncia": "/fɪʃ/",
+            "traducao_pt": "peixe",
+            "classe_gramatical": "n.",
+            "frase_exemplo_en": "The fish swims",
+            "frase_exemplo_traducao": "O peixe nada",
+            "tags": "A1",
+        }
+    ]
+
+    response = client.post("/generate", json={
+        "topic": "Animals",
+        "language": "english",
+    })
+
+    assert response.status_code == 200
+    card = response.json()["cards"][0]
+    assert card["target_word"] == "fish"
+    assert card["image_url"] is not None
+    mock_imagem.assert_called_once()
+    args, _ = mock_imagem.call_args
+    assert args[0] == "fish"
 
 
 def test_map_english():

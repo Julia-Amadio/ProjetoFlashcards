@@ -1,13 +1,22 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import os
+import uuid
+import tempfile
 from dotenv import load_dotenv
 from modulos.llm_agent import gerar_flashcards_json
+from modulos.buscador_imagens import baixar_imagem_para_arquivo
+from modulos.gerador_audio import gerar_audio_local
+from modulos.language_config import get_language_config
 
 load_dotenv()
 
+MEDIA_DIR = tempfile.mkdtemp(prefix="karta_media_")
+
 app = FastAPI(title="Flashcards AI Service")
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 class GenerateRequest(BaseModel):
     topic: str = Field(..., min_length=1, max_length=200)
@@ -30,6 +39,29 @@ class GenerateResponse(BaseModel):
     deck_title: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
     cards: List[CardResponse] = Field(..., min_length=1)
+
+
+def _attach_media(card: CardResponse, card_dict: dict, voice: str, base_url: str) -> None:
+    image_term = card_dict.get("termo_busca_imagem_en", card.target_word)
+    image_filename = f"{uuid.uuid4()}.jpg"
+    image_path = os.path.join(MEDIA_DIR, image_filename)
+    if baixar_imagem_para_arquivo(image_term, image_path):
+        card.image_url = f"{base_url}media/{image_filename}"
+
+    audio_word_filename = f"{uuid.uuid4()}.mp3"
+    audio_word_base = audio_word_filename.replace(".mp3", "")
+    result, _ = gerar_audio_local(card.target_word, audio_word_base, voice, diretorio=MEDIA_DIR)
+    if result:
+        card.audio_word_url = f"{base_url}media/{audio_word_filename}"
+
+    if card.target_sentence:
+        audio_sentence_filename = f"{uuid.uuid4()}.mp3"
+        audio_sentence_base = audio_sentence_filename.replace(".mp3", "")
+        result, _ = gerar_audio_local(
+            card.target_sentence, audio_sentence_base, voice, diretorio=MEDIA_DIR
+        )
+        if result:
+            card.audio_sentence_url = f"{base_url}media/{audio_sentence_filename}"
 
 
 def _map_card_to_unified(card: dict, language: str) -> CardResponse:
@@ -126,7 +158,7 @@ def read_root():
     return {"status": "AI Service running"}
 
 @app.post("/generate", response_model=GenerateResponse)
-def generate_cards(req: GenerateRequest):
+def generate_cards(req: GenerateRequest, request: Request):
     api_key = os.getenv("OPENAI_API_KEY")
     if api_key:
         try:
@@ -136,7 +168,14 @@ def generate_cards(req: GenerateRequest):
                 mode="topic",
                 difficulty_level=req.difficulty_level or ""
             )
-            cards = [_map_card_to_unified(c, req.language) for c in card_dicts]
+            config = get_language_config(req.language)
+            voice = config["voice"]
+            base_url = str(request.base_url)
+            cards = []
+            for card_dict in card_dicts:
+                card = _map_card_to_unified(card_dict, req.language)
+                _attach_media(card, card_dict, voice, base_url)
+                cards.append(card)
             return GenerateResponse(
                 deck_title=req.topic,
                 description=f"Generated flashcards about {req.topic} in {req.language}",
