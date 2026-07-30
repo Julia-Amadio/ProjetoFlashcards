@@ -127,6 +127,20 @@ export const api = {
       token,
     ),
 
+  updateDeck: (
+    deckId: number,
+    token: string,
+    data: { title?: string; description?: string; language?: string; difficultyLevel?: string },
+  ) =>
+    request<DeckSummary>(
+      `/decks/${deckId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+      token,
+    ),
+
+  deleteDeck: (deckId: number, token: string) =>
+    request<void>(`/decks/${deckId}`, { method: 'DELETE' }, token),
+
   generateDeck: (
     token: string,
     data: { topic: string; language: string; difficultyLevel?: string },

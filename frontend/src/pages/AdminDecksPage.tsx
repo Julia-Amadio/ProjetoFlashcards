@@ -1,4 +1,4 @@
-import { BookOpen, Check, Layers3, Plus, RefreshCw } from 'lucide-react'
+import { BookOpen, Check, Layers3, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { PageState } from '../components/PageState'
 import { useAuth } from '../context/AuthContext'
@@ -23,6 +23,9 @@ export function AdminDecksPage({ navigate }: { navigate: (path: string) => void 
   const [loadError, setLoadError] = useState('')
   const [formError, setFormError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [actionError, setActionError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
@@ -48,6 +51,26 @@ export function AdminDecksPage({ navigate }: { navigate: (path: string) => void 
     setSaved(false)
   }
 
+  function edit(deck: DeckSummary) {
+    setEditingId(deck.id)
+    setForm({
+      title: deck.title,
+      description: deck.description ?? '',
+      language: deck.language,
+      difficultyLevel: deck.difficultyLevel ?? '',
+    })
+    setFormError('')
+    setSaved(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setFormError('')
+    setSaved(false)
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (!session?.token) return
@@ -55,19 +78,53 @@ export function AdminDecksPage({ navigate }: { navigate: (path: string) => void 
     setFormError('')
     setSaved(false)
     try {
-      const created = await api.createDeck(session.token, {
+      const data = {
         title: form.title.trim(),
         description: form.description.trim(),
         language: form.language.trim(),
-        ...(form.difficultyLevel.trim() ? { difficultyLevel: form.difficultyLevel.trim() } : {}),
+      }
+      const savedDeck = editingId === null
+        ? await api.createDeck(session.token, {
+          ...data,
+          ...(form.difficultyLevel.trim() ? { difficultyLevel: form.difficultyLevel.trim() } : {}),
+        })
+        : await api.updateDeck(editingId, session.token, {
+          ...data,
+          difficultyLevel: form.difficultyLevel.trim(),
+        })
+      setDecks(current => {
+        const next = editingId === null
+          ? [...current, savedDeck]
+          : current.map(deck => deck.id === editingId ? savedDeck : deck)
+        return next.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
       })
-      setDecks(current => [...current, created].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')))
+      setEditingId(null)
       setForm(emptyForm)
       setSaved(true)
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Não foi possível criar o deck.')
+      setFormError(err instanceof Error ? err.message : 'Não foi possível salvar o deck.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function remove(deck: DeckSummary) {
+    if (!session?.token) return
+    const confirmed = window.confirm(
+      `Excluir "${deck.title}"? Os flashcards, favoritos e progressos relacionados também serão removidos. Esta ação não pode ser desfeita.`,
+    )
+    if (!confirmed) return
+
+    setDeletingId(deck.id)
+    setActionError('')
+    try {
+      await api.deleteDeck(deck.id, session.token)
+      setDecks(current => current.filter(item => item.id !== deck.id))
+      if (editingId === deck.id) cancelEdit()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Não foi possível remover o deck.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -81,8 +138,9 @@ export function AdminDecksPage({ navigate }: { navigate: (path: string) => void 
     <section className="admin-decks-layout">
       <form className="generate-form" onSubmit={submit}>
         <div className="generate-form__intro">
-          <span className="setting-icon"><Plus /></span>
-          <div><h2>Novo deck</h2><p>Crie a estrutura do deck e depois adicione seus flashcards.</p></div>
+          <span className="setting-icon">{editingId === null ? <Plus /> : <Pencil />}</span>
+          <div><h2>{editingId === null ? 'Novo deck' : 'Editar deck'}</h2><p>{editingId === null ? 'Crie a estrutura do deck e depois adicione seus flashcards.' : 'Altere os dados do deck selecionado.'}</p></div>
+          {editingId !== null && <button className="icon-button edit-cancel" type="button" onClick={cancelEdit} aria-label="Cancelar edição"><X /></button>}
         </div>
         <label htmlFor="deck-title">Título
           <input id="deck-title" value={form.title} onChange={event => update('title', event.target.value)} maxLength={100} required />
@@ -98,9 +156,9 @@ export function AdminDecksPage({ navigate }: { navigate: (path: string) => void 
             <input id="deck-difficulty" value={form.difficultyLevel} onChange={event => update('difficultyLevel', event.target.value)} maxLength={50} placeholder="Ex.: A1" />
           </label>
         </div>
-        {saved && <span className="save-confirmation" role="status"><Check /> Deck criado com sucesso</span>}
+        {saved && <span className="save-confirmation" role="status"><Check /> Deck salvo com sucesso</span>}
         {formError && <p className="form-error" role="alert">{formError}</p>}
-        <button className="primary-button" type="submit" disabled={saving}><Plus /> {saving ? 'Criando...' : 'Criar deck'}</button>
+        <button className="primary-button" type="submit" disabled={saving}>{editingId === null ? <Plus /> : <Check />} {saving ? 'Salvando...' : editingId === null ? 'Criar deck' : 'Salvar alterações'}</button>
       </form>
 
       <section className="admin-deck-list">
@@ -108,6 +166,7 @@ export function AdminDecksPage({ navigate }: { navigate: (path: string) => void 
           <div><span className="eyebrow">CATÁLOGO</span><h2>Decks cadastrados</h2></div>
           <span>{decks.length} nesta página</span>
         </div>
+        {actionError && <p className="form-error" role="alert">{actionError}</p>}
         {loading
           ? <PageState kind="loading" title="Carregando decks" description="Buscando o catálogo no servidor." />
           : loadError
@@ -117,7 +176,11 @@ export function AdminDecksPage({ navigate }: { navigate: (path: string) => void 
                 {decks.map(deck => <article key={deck.id}>
                   <span className="setting-icon"><Layers3 /></span>
                   <div><h3>{deck.title}</h3><p>{deck.language}{deck.difficultyLevel ? ` · ${deck.difficultyLevel}` : ''}</p></div>
-                  <button className="text-button" onClick={() => navigate(`/study/${deck.id}`)}><BookOpen /> Abrir</button>
+                  <div className="admin-deck-actions">
+                    <button className="icon-button" onClick={() => navigate(`/study/${deck.id}`)} aria-label={`Abrir ${deck.title}`}><BookOpen /></button>
+                    <button className="icon-button" onClick={() => edit(deck)} aria-label={`Editar ${deck.title}`}><Pencil /></button>
+                    <button className="icon-button danger-button" onClick={() => remove(deck)} disabled={deletingId === deck.id} aria-label={`Excluir ${deck.title}`}><Trash2 /></button>
+                  </div>
                 </article>)}
               </div>
               : <PageState kind="empty" title="Nenhum deck cadastrado" description="Use o formulário para criar o primeiro deck." />}
