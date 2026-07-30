@@ -15,18 +15,17 @@ remover ou implementar o endpoint quando alguém for mexer ali.
 
 ## Frontend (React / TypeScript)
 
-Esse é o gap real de hoje. O backend suporta tudo abaixo, mas a interface não chama nada disso:
+Checklist do frontend:
 
-- [ ] Tela/ação de admin para gerar deck via IA (`POST /decks/generate`).
-- [ ] Telas de admin para CRUD de decks e flashcards (criar/editar/remover) — rotas já protegidas
-  no backend, só faltam ser chamadas.
-- [ ] Renderizar imagem e áudio dos flashcards (`GET /flashcards/{id}/image`, `.../audio/word`,
-  `.../audio/sentence`) — hoje nenhum componente usa esses endpoints; a preferência
-  `autoplayAudio` já existe em `UserPreferencesDTO` mas não tem áudio nenhum pra tocar ainda.
-- [ ] Adicionar as funções correspondentes em `lib/api.ts` (nenhuma delas existe hoje).
-- [ ] Adicionar o frontend ao Docker Compose ou documentar o modelo de deploy separado quando essa
-  decisão for tomada.
-- [ ] Adicionar testes automatizados da interface e do cliente HTTP.
+- [x] Tela/ação de admin para gerar deck via IA (`POST /decks/generate`).
+- [x] Telas de admin para CRUD de decks e flashcards (criar, editar e remover).
+- [x] Renderizar imagem e áudio dos flashcards (`GET /flashcards/{id}/image`, `.../audio/word`,
+  `.../audio/sentence`) — a tela de estudo exibe a imagem, reproduz os dois áudios e a preferência
+  `autoplayAudio` usa o áudio real da palavra, mantendo a síntese do navegador como fallback.
+- [x] Adicionar as funções de administração correspondentes em `lib/api.ts`.
+- [x] Adicionar o frontend ao Docker Compose (build multi-stage + Nginx com proxy `/api` e fallback
+  das rotas da SPA).
+- [x] Adicionar testes automatizados do cliente HTTP e dos principais fluxos da interface.
 
 ## python-services (Python / FastAPI)
 

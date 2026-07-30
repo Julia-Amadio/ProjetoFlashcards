@@ -5,9 +5,9 @@ cartões de memorização. O projeto possui autenticação JWT, gerenciamento de
 decks e flashcards (com CRUD completo para administradores), geração de decks via IA, favoritos,
 progresso de estudo e preferências — tudo persistido no backend.
 
-> ⚠️ **Aviso:** este projeto ainda está em **desenvolvimento**. O que falta hoje é
-> majoritariamente frontend: telas de admin para gerar deck via IA e gerenciar decks/flashcards, e
-> a renderização de imagem/áudio dos cards gerados. Veja `docs/TODO.md` para o detalhamento.
+> ⚠️ **Aviso:** este projeto ainda está em **desenvolvimento**. As funcionalidades do frontend
+> estão integradas e cobertas pelos principais testes automatizados; as pendências restantes são
+> de infraestrutura e preparação para um eventual deploy. Veja `docs/TODO.md`.
 
 ---
 
@@ -43,9 +43,9 @@ Existem atualmente dois níveis de acesso (*roles*):
 
 ## Como Executar - Aplicação completa (Docker Compose)
 
-Backend e serviço Python sobem via Docker Compose, direto contra o banco na nuvem (Neon). Não é
-necessário ter Java, Maven, PostgreSQL ou Python instalados na máquina, só o Docker. O build das
-imagens acontece dentro dos containers.
+Frontend, backend e serviço Python sobem via Docker Compose, direto contra o banco na nuvem
+(Neon). Não é necessário ter Node, Java, Maven, PostgreSQL ou Python instalados na máquina, só o
+Docker. O build das imagens acontece dentro dos containers.
 
 ### Pré-requisitos
 
@@ -74,6 +74,7 @@ O `application.properties` só sabe conectar no banco se existir um `backend/.en
 
 Depois de subir, os serviços ficam disponíveis em:
 
+* Frontend (React + Nginx): `http://localhost:5173`
 * Backend (Spring Boot): `http://localhost:8080`
 * Swagger UI: `http://localhost:8080/swagger-ui/index.html` (liberado sem token em dev)
 * Python Services (FastAPI): `http://localhost:8000`
@@ -88,9 +89,9 @@ docker compose down
 
 ---
 
-## Como Executar - Frontend React
+## Como Executar - Frontend React em desenvolvimento
 
-O frontend fica em `frontend/` e roda fora do Compose atual:
+Para trabalhar no frontend com hot reload, ele também pode rodar fora do Compose:
 
 ```bash
 cd frontend
@@ -106,13 +107,13 @@ O Vite abre em `http://localhost:5173` e encaminha `/api` ao backend em
 ```bash
 npm run lint
 npm run build
+npm test
 ```
 
 Cadastro, login (com sessão JWT persistida), catálogo de decks, tela de estudo, favoritos,
 progresso de revisão e preferências já são integrados ao backend real — nada disso usa mais
-dados estáticos ou `localStorage` como fonte de verdade. O que ainda falta no frontend (geração
-de deck via IA, CRUD de admin, exibição de imagem/áudio dos cards) está detalhado em
-`docs/TODO.md`.
+dados estáticos ou `localStorage` como fonte de verdade. Geração via IA, CRUD administrativo e
+mídia dos flashcards também estão integrados.
 
 ---
 

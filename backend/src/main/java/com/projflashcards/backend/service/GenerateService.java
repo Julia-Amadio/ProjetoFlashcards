@@ -104,6 +104,7 @@ public class GenerateService {
         return new DeckSummaryDTO(
                 finalDeck.getId(),
                 finalDeck.getTitle(),
+                finalDeck.getDescription(),
                 finalDeck.getLanguage(),
                 finalDeck.getDifficultyLevel()
         );

@@ -10,6 +10,7 @@ import type { ApiFlashcard, Flashcard } from '../types'
 type Rating = 'again' | 'almost' | 'easy'
 type LoadState = 'loading' | 'ready' | 'empty' | 'error'
 type StudyDeck = { id: number; title: string; accent: string; speechLanguage: string }
+type StudyCard = Flashcard & { id: number }
 const emptyResults: StudyResults = { again: 0, almost: 0, easy: 0 }
 
 // Cores e locais de fala não existem no backend — são só apresentação, então derivamos
@@ -27,8 +28,9 @@ function speechLocaleFor(language: string) {
   return speechLocaleByLanguage[language.trim().toLocaleLowerCase('pt-BR')] || 'en-US'
 }
 
-function toFlashcard(card: ApiFlashcard): Flashcard {
+function toFlashcard(card: ApiFlashcard): StudyCard {
   return {
+    id: card.id,
     word: card.targetWord,
     phonetic: card.phoneticReading ?? '',
     translation: card.nativeTranslation,
@@ -39,18 +41,18 @@ function toFlashcard(card: ApiFlashcard): Flashcard {
 
 export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (path: string) => void }) {
   const { session } = useAuth()
+  const token = session?.token
+  const userId = session?.user?.id
   const [state, setState] = useState<LoadState>('loading')
   const [deck, setDeck] = useState<StudyDeck | null>(null)
-  const [cards, setCards] = useState<Flashcard[]>([])
+  const [cards, setCards] = useState<StudyCard[]>([])
   const [initialProgress, setInitialProgress] = useState<StudyProgress>(emptyStudyProgress)
   const [preferences, setPreferences] = useState<StudyPreferences>(defaultPreferences)
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
-    if (!session?.token || !session.user?.id) return
+    if (!token || !userId) return
     const controller = new AbortController()
-    const { token } = session
-    const userId = session.user.id
     setState('loading')
 
     Promise.all([
@@ -81,7 +83,7 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
       })
 
     return () => controller.abort()
-  }, [deckId, session?.token, session?.user?.id])
+  }, [deckId, token, userId])
 
   if (state === 'loading') {
     return <main className="study-page study-not-found">
@@ -95,7 +97,7 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
     </main>
   }
 
-  if (state !== 'ready' || !deck || !session?.token || !session.user?.id) {
+  if (state !== 'ready' || !deck || !token || !userId) {
     return <main className="study-page study-not-found">
       <PageState kind="error" title="Este estudo não está disponível" description={errorMessage || 'Volte à biblioteca para escolher um dos decks disponíveis.'} action={<button className="primary-button" onClick={() => navigate('/')}><ArrowLeft /> Voltar à biblioteca</button>} />
     </main>
@@ -104,8 +106,8 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
   return <StudySession
     deck={deck}
     cards={cards}
-    userId={session.user.id}
-    token={session.token}
+    userId={userId}
+    token={token}
     initialProgress={initialProgress}
     preferences={preferences}
     navigate={navigate}
@@ -114,7 +116,7 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
 
 function StudySession({ deck, cards, userId, token, initialProgress, preferences, navigate }: {
   deck: StudyDeck
-  cards: Flashcard[]
+  cards: StudyCard[]
   userId: string
   token: string
   initialProgress: StudyProgress
@@ -126,6 +128,15 @@ function StudySession({ deck, cards, userId, token, initialProgress, preferences
   const [completed, setCompleted] = useState(initialProgress.completed)
   const [results, setResults] = useState<StudyResults>(initialProgress.results)
   const readyToPersist = useRef(false)
+  const wordAudioRef = useRef<HTMLAudioElement>(null)
+  const sentenceAudioRef = useRef<HTMLAudioElement>(null)
+  const [media, setMedia] = useState<{
+    cardId: number
+    status: 'loading' | 'ready'
+    imageUrl: string | null
+    wordAudioUrl: string | null
+    sentenceAudioUrl: string | null
+  }>({ cardId: cards[initialProgress.index].id, status: 'loading', imageUrl: null, wordAudioUrl: null, sentenceAudioUrl: null })
   const card = cards[index]
   const speechLanguage = deck.speechLanguage
   const hasProgress = index > 0 || revealed || Object.values(results).some(value => value > 0)
@@ -144,13 +155,30 @@ function StudySession({ deck, cards, userId, token, initialProgress, preferences
     setResults(emptyResults)
   }
 
-  const speak = useCallback(() => {
+  const speakWithBrowser = useCallback(() => {
     if (!('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(card.word)
     utterance.lang = speechLanguage
     window.speechSynthesis.speak(utterance)
   }, [card.word, speechLanguage])
+
+  const speak = useCallback(() => {
+    if (media.cardId !== card.id || media.status === 'loading') return
+    if (media.wordAudioUrl && wordAudioRef.current) {
+      wordAudioRef.current.currentTime = 0
+      void wordAudioRef.current.play()
+      return
+    }
+    speakWithBrowser()
+  }, [card.id, media.cardId, media.status, media.wordAudioUrl, speakWithBrowser])
+
+  const speakSentence = useCallback((event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    if (!sentenceAudioRef.current) return
+    sentenceAudioRef.current.currentTime = 0
+    void sentenceAudioRef.current.play()
+  }, [])
 
   const exitStudy = useCallback(() => {
     if (preferences.confirmExit && !completed && hasProgress && !window.confirm('Deseja sair desta sessão? Seu progresso ficará salvo.')) return
@@ -171,8 +199,43 @@ function StudySession({ deck, cards, userId, token, initialProgress, preferences
   }, [completed, deck.id, index, results, revealed, token, userId])
 
   useEffect(() => {
+    const controller = new AbortController()
+    let objectUrls: string[] = []
+    setMedia({ cardId: card.id, status: 'loading', imageUrl: null, wordAudioUrl: null, sentenceAudioUrl: null })
+
+    Promise.all([
+      api.getFlashcardImage(card.id, token, controller.signal),
+      api.getFlashcardWordAudio(card.id, token, controller.signal),
+      api.getFlashcardSentenceAudio(card.id, token, controller.signal),
+    ]).then(([image, wordAudio, sentenceAudio]) => {
+      const toUrl = (blob: Blob | null) => {
+        if (!blob) return null
+        const url = URL.createObjectURL(blob)
+        objectUrls.push(url)
+        return url
+      }
+      setMedia({
+        cardId: card.id,
+        status: 'ready',
+        imageUrl: toUrl(image),
+        wordAudioUrl: toUrl(wordAudio),
+        sentenceAudioUrl: toUrl(sentenceAudio),
+      })
+    }).catch(error => {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      setMedia({ cardId: card.id, status: 'ready', imageUrl: null, wordAudioUrl: null, sentenceAudioUrl: null })
+    })
+
+    return () => {
+      controller.abort()
+      objectUrls.forEach(url => URL.revokeObjectURL(url))
+      objectUrls = []
+    }
+  }, [card.id, token])
+
+  useEffect(() => {
     if (preferences.autoplayAudio && !completed) speak()
-  }, [completed, index, preferences.autoplayAudio, speak])
+  }, [completed, preferences.autoplayAudio, speak])
 
   useEffect(() => {
     function warnBeforeUnload(event: BeforeUnloadEvent) {
@@ -229,8 +292,12 @@ function StudySession({ deck, cards, userId, token, initialProgress, preferences
       <div className="complete-actions"><button className="primary-button" onClick={() => navigate('/')}>Voltar ao painel</button><button className="secondary-button" onClick={restart}><RotateCcw /> Revisar novamente</button></div>
     </section> : <>
       <section className={`flashcard ${revealed ? 'revealed' : ''}`} onClick={() => setRevealed(true)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setRevealed(true) } }} role="button" tabIndex={0} aria-label={revealed ? `${card.word}, ${card.translation}` : `${card.word}. Pressione para revelar a resposta`}>
-        <span className="eyebrow">TRADUZA ESTA PALAVRA</span><button className="sound-button" onClick={speakFromButton} aria-label="Ouvir pronúncia" aria-keyshortcuts="R"><Volume2 /></button><strong>{card.word}</strong><em>{card.phonetic}</em>
-        {!revealed ? <div className="reveal-hint"><RotateCcw /> Toque para revelar</div> : <div className="answer"><span>RESPOSTA</span><h2>{card.translation}</h2><blockquote>{card.sentence}<small>{card.sentenceTranslation}</small></blockquote></div>}
+        <audio ref={wordAudioRef} src={media.wordAudioUrl ?? undefined} />
+        <audio ref={sentenceAudioRef} src={media.sentenceAudioUrl ?? undefined} />
+        <span className="eyebrow">TRADUZA ESTA PALAVRA</span><button className="sound-button" onClick={speakFromButton} aria-label="Ouvir pronúncia" aria-keyshortcuts="R" disabled={media.cardId !== card.id || media.status === 'loading'}><Volume2 /></button>
+        {media.cardId === card.id && media.imageUrl && <img className="flashcard-image" src={media.imageUrl} alt="" />}
+        <strong>{card.word}</strong><em>{card.phonetic}</em>
+        {!revealed ? <div className="reveal-hint"><RotateCcw /> Toque para revelar</div> : <div className="answer"><span>RESPOSTA</span><h2>{card.translation}</h2><blockquote>{card.sentence}{media.cardId === card.id && media.sentenceAudioUrl && <button className="sentence-sound-button" onClick={speakSentence} aria-label="Ouvir frase de exemplo"><Volume2 /></button>}<small>{card.sentenceTranslation}</small></blockquote></div>}
       </section>
       <div className={`answer-actions ${revealed ? 'visible' : ''}`}><span>Como foi?</span><div><button onClick={() => rate('again')} aria-keyshortcuts="1"><kbd>1</kbd> Ainda não</button><button onClick={() => rate('almost')} aria-keyshortcuts="2"><kbd>2</kbd> Quase</button><button onClick={() => rate('easy')} aria-keyshortcuts="3"><kbd>3</kbd> Fácil!</button></div></div>
       <p className="study-shortcuts" aria-label="Atalhos de teclado"><span><kbd>Espaço</kbd> revelar</span><span><kbd>R</kbd> ouvir</span><span><kbd>Esc</kbd> sair</span></p>

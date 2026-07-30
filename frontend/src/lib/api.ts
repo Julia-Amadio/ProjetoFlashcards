@@ -50,7 +50,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     const validationMessage = body?.errors
       ? Object.values(body.errors).join(' ')
       : undefined
-    throw new ApiError(body?.message || body?.detail || validationMessage || fallback, response.status)
+    throw new ApiError(body?.detail || validationMessage || body?.message || fallback, response.status)
   }
 
   if (response.status === 204) return undefined as T
@@ -59,6 +59,38 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
 
   const contentType = response.headers.get('content-type') || ''
   return (contentType.includes('application/json') ? JSON.parse(text) : text) as T
+}
+
+async function requestMedia(
+  path: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<Blob | null> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      signal,
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new ApiError(
+      'Não foi possível conectar ao servidor. Confirme se o backend está rodando na porta 8080.',
+      0,
+    )
+  }
+
+  // Cards criados manualmente não têm mídia; nesse caso, 404 é um resultado esperado.
+  if (response.status === 404) return null
+  if (response.status === 401) {
+    window.dispatchEvent(new Event(SESSION_UNAUTHORIZED_EVENT))
+  }
+  if (!response.ok) {
+    throw new ApiError('Não foi possível carregar a mídia deste cartão.', response.status)
+  }
+
+  return response.blob()
 }
 
 export const api = {
@@ -85,6 +117,30 @@ export const api = {
   getDeck: (id: number, token: string, signal?: AbortSignal) =>
     request<DeckSummary>(`/decks/${id}`, { signal }, token),
 
+  createDeck: (
+    token: string,
+    data: { title: string; description?: string; language: string; difficultyLevel?: string },
+  ) =>
+    request<DeckSummary>(
+      '/decks',
+      { method: 'POST', body: JSON.stringify(data) },
+      token,
+    ),
+
+  updateDeck: (
+    deckId: number,
+    token: string,
+    data: { title?: string; description?: string; language?: string; difficultyLevel?: string },
+  ) =>
+    request<DeckSummary>(
+      `/decks/${deckId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+      token,
+    ),
+
+  deleteDeck: (deckId: number, token: string) =>
+    request<void>(`/decks/${deckId}`, { method: 'DELETE' }, token),
+
   // Dispara a geração via IA (ROLE_ADMIN). Pode levar alguns segundos: o backend só responde
   // depois que o python-services gerou texto+mídia e o deck já foi persistido no banco.
   generateDeck: (token: string, data: DeckGenerateRequest) =>
@@ -92,6 +148,40 @@ export const api = {
 
   listFlashcards: (deckId: number, token: string, signal?: AbortSignal) =>
     request<ApiFlashcard[]>(`/decks/${deckId}/flashcards`, { signal }, token),
+
+  createFlashcard: (
+    deckId: number,
+    token: string,
+    data: Omit<ApiFlashcard, 'id'>,
+  ) =>
+    request<ApiFlashcard>(
+      `/decks/${deckId}/flashcards`,
+      { method: 'POST', body: JSON.stringify(data) },
+      token,
+    ),
+
+  updateFlashcard: (
+    flashcardId: number,
+    token: string,
+    data: Partial<Omit<ApiFlashcard, 'id'>>,
+  ) =>
+    request<ApiFlashcard>(
+      `/flashcards/${flashcardId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+      token,
+    ),
+
+  deleteFlashcard: (flashcardId: number, token: string) =>
+    request<void>(`/flashcards/${flashcardId}`, { method: 'DELETE' }, token),
+
+  getFlashcardImage: (flashcardId: number, token: string, signal?: AbortSignal) =>
+    requestMedia(`/flashcards/${flashcardId}/image`, token, signal),
+
+  getFlashcardWordAudio: (flashcardId: number, token: string, signal?: AbortSignal) =>
+    requestMedia(`/flashcards/${flashcardId}/audio/word`, token, signal),
+
+  getFlashcardSentenceAudio: (flashcardId: number, token: string, signal?: AbortSignal) =>
+    requestMedia(`/flashcards/${flashcardId}/audio/sentence`, token, signal),
 
   getFavorites: (userId: string, token: string, signal?: AbortSignal) =>
     request<DeckSummary[]>(`/users/${userId}/favorites`, { signal }, token),

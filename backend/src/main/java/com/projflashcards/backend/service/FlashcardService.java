@@ -55,12 +55,12 @@ public class FlashcardService {
                 .orElseThrow(() -> new ResourceNotFoundException("Flashcard não encontrado"));
 
         if (dto.targetWord() != null) card.setTargetWord(dto.targetWord());
-        if (dto.phoneticReading() != null) card.setPhoneticReading(dto.phoneticReading());
+        if (dto.phoneticReading() != null) card.setPhoneticReading(nullableText(dto.phoneticReading()));
         if (dto.nativeTranslation() != null) card.setNativeTranslation(dto.nativeTranslation());
-        if (dto.partOfSpeech() != null) card.setPartOfSpeech(dto.partOfSpeech());
-        if (dto.targetSentence() != null) card.setTargetSentence(dto.targetSentence());
-        if (dto.sentencePhonetic() != null) card.setSentencePhonetic(dto.sentencePhonetic());
-        if (dto.sentenceTranslation() != null) card.setSentenceTranslation(dto.sentenceTranslation());
+        if (dto.partOfSpeech() != null) card.setPartOfSpeech(nullableText(dto.partOfSpeech()));
+        if (dto.targetSentence() != null) card.setTargetSentence(nullableText(dto.targetSentence()));
+        if (dto.sentencePhonetic() != null) card.setSentencePhonetic(nullableText(dto.sentencePhonetic()));
+        if (dto.sentenceTranslation() != null) card.setSentenceTranslation(nullableText(dto.sentenceTranslation()));
 
         card = flashcardRepository.save(card);
         return toDTO(card);
@@ -72,6 +72,10 @@ public class FlashcardService {
             throw new ResourceNotFoundException("Flashcard não encontrado");
         }
         flashcardRepository.deleteById(id);
+    }
+
+    private String nullableText(String value) {
+        return value.isBlank() ? null : value;
     }
 
     private FlashcardDTO toDTO(Flashcard card) {

@@ -3,6 +3,7 @@ package com.projflashcards.backend.controller;
 import com.projflashcards.backend.dto.DeckCreateDTO;
 import com.projflashcards.backend.dto.DeckGenerateDTO;
 import com.projflashcards.backend.dto.DeckSummaryDTO;
+import com.projflashcards.backend.dto.DeckUpdateDTO;
 import com.projflashcards.backend.service.DeckService;
 import com.projflashcards.backend.service.GenerateService;
 import jakarta.validation.Valid;
@@ -48,5 +49,18 @@ public class DeckController {
     @GetMapping("/{id}")
     public ResponseEntity<DeckSummaryDTO> findById(@PathVariable Long id) {
         return ResponseEntity.ok(deckService.findById(id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<DeckSummaryDTO> update(
+            @PathVariable Long id,
+            @RequestBody @Valid DeckUpdateDTO dto) {
+        return ResponseEntity.ok(deckService.update(id, dto));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        deckService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

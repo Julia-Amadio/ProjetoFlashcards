@@ -43,6 +43,8 @@ public class SecurityConfigurations {
 					.requestMatchers(HttpMethod.DELETE, "/users/*").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.POST, "/decks/generate").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.POST, "/decks").hasAuthority("ROLE_ADMIN")
+					.requestMatchers(HttpMethod.PUT, "/decks/*").hasAuthority("ROLE_ADMIN")
+					.requestMatchers(HttpMethod.DELETE, "/decks/*").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.POST, "/decks/*/flashcards").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.PUT, "/flashcards/**").hasAuthority("ROLE_ADMIN")
 					.requestMatchers(HttpMethod.DELETE, "/flashcards/**").hasAuthority("ROLE_ADMIN")
