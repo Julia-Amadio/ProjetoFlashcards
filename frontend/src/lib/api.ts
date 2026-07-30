@@ -61,6 +61,38 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   return (contentType.includes('application/json') ? JSON.parse(text) : text) as T
 }
 
+async function requestMedia(
+  path: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<Blob | null> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      signal,
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new ApiError(
+      'Não foi possível conectar ao servidor. Confirme se o backend está rodando na porta 8080.',
+      0,
+    )
+  }
+
+  // Cards criados manualmente não têm mídia; nesse caso, 404 é um resultado esperado.
+  if (response.status === 404) return null
+  if (response.status === 401) {
+    window.dispatchEvent(new Event(SESSION_UNAUTHORIZED_EVENT))
+  }
+  if (!response.ok) {
+    throw new ApiError('Não foi possível carregar a mídia deste cartão.', response.status)
+  }
+
+  return response.blob()
+}
+
 export const api = {
   login: async (email: string, password: string) => {
     const response = await request<LoginResponse>('/login', {
@@ -87,6 +119,15 @@ export const api = {
 
   listFlashcards: (deckId: number, token: string, signal?: AbortSignal) =>
     request<ApiFlashcard[]>(`/decks/${deckId}/flashcards`, { signal }, token),
+
+  getFlashcardImage: (flashcardId: number, token: string, signal?: AbortSignal) =>
+    requestMedia(`/flashcards/${flashcardId}/image`, token, signal),
+
+  getFlashcardWordAudio: (flashcardId: number, token: string, signal?: AbortSignal) =>
+    requestMedia(`/flashcards/${flashcardId}/audio/word`, token, signal),
+
+  getFlashcardSentenceAudio: (flashcardId: number, token: string, signal?: AbortSignal) =>
+    requestMedia(`/flashcards/${flashcardId}/audio/sentence`, token, signal),
 
   getFavorites: (userId: string, token: string, signal?: AbortSignal) =>
     request<DeckSummary[]>(`/users/${userId}/favorites`, { signal }, token),

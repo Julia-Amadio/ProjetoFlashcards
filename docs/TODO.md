@@ -20,10 +20,11 @@ Esse é o gap real de hoje. O backend suporta tudo abaixo, mas a interface não 
 - [ ] Tela/ação de admin para gerar deck via IA (`POST /decks/generate`).
 - [ ] Telas de admin para CRUD de decks e flashcards (criar/editar/remover) — rotas já protegidas
   no backend, só faltam ser chamadas.
-- [ ] Renderizar imagem e áudio dos flashcards (`GET /flashcards/{id}/image`, `.../audio/word`,
-  `.../audio/sentence`) — hoje nenhum componente usa esses endpoints; a preferência
-  `autoplayAudio` já existe em `UserPreferencesDTO` mas não tem áudio nenhum pra tocar ainda.
-- [ ] Adicionar as funções correspondentes em `lib/api.ts` (nenhuma delas existe hoje).
+- [x] Renderizar imagem e áudio dos flashcards (`GET /flashcards/{id}/image`, `.../audio/word`,
+  `.../audio/sentence`) — a tela de estudo exibe a imagem, reproduz os dois áudios e a preferência
+  `autoplayAudio` usa o áudio real da palavra, mantendo a síntese do navegador como fallback.
+- [ ] Adicionar as funções de administração correspondentes em `lib/api.ts` (as funções de mídia
+  já existem; ainda faltam geração via IA e CRUD de decks/flashcards).
 - [ ] Adicionar o frontend ao Docker Compose ou documentar o modelo de deploy separado quando essa
   decisão for tomada.
 - [ ] Adicionar testes automatizados da interface e do cliente HTTP.
