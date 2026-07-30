@@ -25,7 +25,8 @@ Esse é o gap real de hoje. O backend suporta tudo abaixo, mas a interface não 
 - [x] Adicionar as funções de administração correspondentes em `lib/api.ts`.
 - [x] Adicionar o frontend ao Docker Compose (build multi-stage + Nginx com proxy `/api` e fallback
   das rotas da SPA).
-- [ ] Adicionar testes automatizados da interface e do cliente HTTP.
+- [ ] Adicionar testes automatizados — cliente HTTP coberto com Vitest; testes dos componentes e
+  fluxos da interface continuam pendentes.
 
 ## python-services (Python / FastAPI)
 

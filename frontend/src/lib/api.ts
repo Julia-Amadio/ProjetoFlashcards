@@ -50,7 +50,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     const validationMessage = body?.errors
       ? Object.values(body.errors).join(' ')
       : undefined
-    throw new ApiError(body?.message || body?.detail || validationMessage || fallback, response.status)
+    throw new ApiError(body?.detail || validationMessage || body?.message || fallback, response.status)
   }
 
   if (response.status === 204) return undefined as T

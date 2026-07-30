@@ -107,6 +107,7 @@ O Vite abre em `http://localhost:5173` e encaminha `/api` ao backend em
 ```bash
 npm run lint
 npm run build
+npm test
 ```
 
 Cadastro, login (com sessão JWT persistida), catálogo de decks, tela de estudo, favoritos,
