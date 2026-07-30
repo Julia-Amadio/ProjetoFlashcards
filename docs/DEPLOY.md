@@ -42,7 +42,7 @@ já deployado (ex: `https://karta-backend.onrender.com`), nunca um caminho relat
 3. **`frontend` por último** → build com `VITE_API_URL` apontando pra URL do passo 2, só então
    deploy.
 
-## 4. Gap crítico encontrado: CORS não existe hoje
+## 4. Gap crítico encontrado: CORS não existe hoje (mas só importa quando o front for deployado)
 
 Não há **nenhuma** configuração de CORS no Spring (`grep` em `security`/`controller` não achou
 nada). Em dev isso nunca aparece porque o proxy do Vite faz o browser enxergar tudo como
@@ -51,6 +51,12 @@ diferente (`karta-backend.onrender.com`) — sem uma política de CORS liberando
 `SecurityConfigurations`, o browser bloqueia **toda** chamada. Precisa de um bean
 `CorsConfigurationSource` + `.cors(...)` na security chain **antes** de tentar o deploy do front,
 senão o sintoma ("URLs certos, mas nada funciona") só aparece depois de tudo já estar no ar.
+
+> **Isso não bloqueia deployar só `backend` + `python-services` agora.** CORS é uma restrição
+> imposta pelo *browser*, não existe pra chamadas via Postman/curl nem para a comunicação
+> servidor-a-servidor entre os dois containers. Dá pra validar tudo (login, decks, geração via
+> IA) direto nas URLs públicas com o `docs/API_CHEATSHEET.md`, sem esse fix, antes mesmo do front
+> entrar em cena.
 
 ## 5. Imagem e áudio: decisão final — `bytea` no Postgres, sem bucket
 
@@ -89,38 +95,40 @@ IA", onde um spinner de espera já é esperado). Railway e Fly.io são alternati
 free tier dos dois mudaram nos últimos tempos (Railway foi pra crédito de teste, Fly.io pede
 cartão) — vale checar a página de pricing atual de cada um antes de se comprometer.
 
-### `PORT` do `python-services` precisa ser dinâmico pra funcionar no Render/Railway/Fly.io
+### `PORT` dinâmico — **já corrigido nos dois serviços**
 
-Hoje o `Dockerfile` do `python-services` tem o `CMD` em *exec form*:
-```dockerfile
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-Isso não expande variável de ambiente nenhuma — a porta fica sempre travada em 8000. Localmente
-(via `docker-compose.yml`) isso não importa, porque o próprio compose mapeia 8000↔8000 dos dois
-lados. Mas plataformas de container como Render/Railway/Fly.io **atribuem a porta dinamicamente**
-via env var `PORT` no momento do deploy (às vezes não é 8000) e esperam que o processo escute
-exatamente ali — se o container ignora isso, o healthcheck da plataforma pode nunca bater e o
-deploy falha.
+Plataformas de container como Render/Railway/Fly.io **atribuem a porta dinamicamente** via env
+var `PORT` no momento do deploy (às vezes não é a porta padrão do serviço) e esperam que o
+processo escute exatamente ali — se o container ignora isso, o healthcheck da plataforma pode
+nunca bater e o deploy falha. Localmente (via `docker-compose.yml`) isso nunca aparecia, porque o
+compose já mapeia a mesma porta dos dois lados.
 
-Correção necessária antes do deploy do `python-services`: trocar pro *shell form*, que expande
-variável de verdade:
-```dockerfile
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
-```
-O `:-8000` mantém o comportamento local idêntico (cai em 8000 se `PORT` não existir). Contrapartida
-pequena: em *shell form* o Uvicorn roda como processo filho do `sh` (que vira o PID 1), então sinais
-de encerramento (`docker stop`/redeploy) podem não ser repassados tão rápido — aceitável pra escala
-desse projeto.
+* **`python-services/Dockerfile`**: `CMD` trocado de *exec form* pra *shell form*
+  (`CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}`), que expande `$PORT` de verdade —
+  antes era um array (`["uvicorn", ..., "--port", "8000"]`), que não expande variável nenhuma. O
+  `HEALTHCHECK` interno também foi ajustado pra usar a mesma porta dinâmica. Contrapartida pequena
+  do *shell form*: o Uvicorn passa a rodar como processo filho do `sh` (que vira o PID 1), então
+  sinais de encerramento (`docker stop`/redeploy) podem não ser repassados tão rápido — aceitável
+  pra escala desse projeto.
+* **`backend/application.properties`**: adicionado `server.port=${PORT:8080}` — o Spring Boot não
+  lia `PORT` de forma nenhuma antes disso, sempre subia fixo em 8080.
+* Testado localmente (`docker compose up --build`) depois da mudança: os dois continuam subindo
+  normalmente em 8080/8000 (sem `PORT` definida, cai no default de sempre) — nada quebrou pra
+  quem só usa Docker Compose local.
 
 ---
 
 ## Checklist de execução
 
-- [ ] Adicionar configuração de CORS no `SecurityConfigurations` liberando o domínio do front.
-- [ ] Trocar o `CMD` do `python-services/Dockerfile` para *shell form* com `${PORT:-8000}`.
+- [x] Trocar o `CMD` do `python-services/Dockerfile` para *shell form* com `${PORT:-8000}`.
+- [x] Adicionar `server.port=${PORT:8080}` no `application.properties` do backend.
 - [ ] Deploy do `python-services` no Render → anotar URL pública.
 - [ ] Deploy do `backend` no Render, com `PYTHON_SERVICE_URL` apontando pra URL acima, e
   `backend/.env` (Neon) configurado nas env vars da plataforma → anotar URL pública.
+- [ ] Testar via `docs/API_CHEATSHEET.md` direto nas URLs públicas (login, decks, geração via IA)
+  — não depende do front nem de CORS.
+- [ ] Adicionar configuração de CORS no `SecurityConfigurations` liberando o domínio do front —
+  só precisa disso a partir daqui.
 - [ ] Build do front com `VITE_API_URL` = URL pública do backend.
 - [ ] Deploy do front (Vercel/Netlify).
-- [ ] Teste ponta a ponta: login, listar decks, favoritar, gerar deck via IA.
+- [ ] Teste ponta a ponta pelo navegador: login, listar decks, favoritar, gerar deck via IA.

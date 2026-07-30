@@ -35,14 +35,8 @@ que só importa na hora do deploy.
 
 ## Infra / Docker
 
-- [ ] Tornar `backend/.env` opcional para o cenário local ou versionar um
-  `backend/.env.example`. Hoje o caminho continua obrigatório e, ao mesmo tempo, suas variáveis
-  são sobrescritas pelo bloco `environment`; alinhar essa precedência para existir uma única
-  fonte de configuração clara.
-- [ ] Reavaliar se o container `postgres` precisa subir quando `DB_URL` aponta pro Neon. Hoje ele
-  sempre sobe e participa do `depends_on`, mesmo quando não é utilizado.
 - [ ] Reavaliar a exposição pública da porta `8000` do `python-services` antes de qualquer deploy
-  real (documentado como mudança futura na seção 6 do `ARCHITECTURE.md`, não aplicado ainda).
+  real (documentado como mudança futura na seção 7 do `ARCHITECTURE.md`, não aplicado ainda).
 - [ ] Avaliar (no audit de segurança pré-deploy) como as credenciais são expostas via env var: hoje
   `docker inspect`/`docker compose config` mostram os valores do `backend/.env` em texto puro pra
   quem tem acesso ao daemon do Docker. Considerar Docker secrets (`/run/secrets/` + `configtree` no
@@ -55,6 +49,11 @@ que só importa na hora do deploy.
 
 ## ✅ Já concluídas
 
+- Tratamento de exceção no `GlobalExceptionHandler`: login com credencial errada agora devolve
+  `401` (antes era `500` genérico); falha na chamada ao `python-services` (erro devolvido por ele
+  ou nem foi possível conectar) devolve `502` com o detalhe real, via nova `ExternalServiceException`
+  lançada pelo `GenerateService`; JSON malformado no corpo e path variable com tipo errado (ex.:
+  `/decks/abc/flashcards`) agora devolvem `400` em vez de `500`
 - `OPENAI_API_KEY` conseguida e configurada — geração via IA agora usa o LLM de verdade, não só o
   `MOCK_RESPONSE`
 - `PEXELS_API_KEY` adicionada ao `python-services/.env`

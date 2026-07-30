@@ -6,7 +6,7 @@ aqui especificados são os mesmos nos dois casos — a única diferença real de
 como o *Bearer Token* é passado, explicado logo abaixo.
 
 > A geração de deck via IA (`POST /decks/generate`) depende do `python-services` estar de pé e
-> configurado (chave de LLM, Pexels, Edge-TTS) — ver `docs/ARCHITECTURE.md`, seção 6, e
+> configurado (chave de LLM, Pexels, Edge-TTS) — ver `docs/ARCHITECTURE.md`, seção 7, e
 > `docs/DEPLOY.md` para o estado atual disso.
 
 ---
@@ -51,7 +51,12 @@ Resposta: `200 OK` com `LoginResponseDTO` — **JSON**, não texto puro:
   "user": { "id": "uuid...", "name": "...", "email": "...", "role": "ROLE_USER", "createdAt": "..." }
 }
 ```
-Credenciais inválidas retornam erro de autenticação antes mesmo de chegar ao Controller.
+Credenciais inválidas (e-mail inexistente ou senha errada) retornam `401 Unauthorized`:
+```json
+{ "message": "E-mail ou senha inválidos.", "errors": null }
+```
+A mensagem é sempre a mesma pros dois casos, de propósito — não dá pra saber se o e-mail existe
+ou não a partir da resposta.
 
 ---
 
@@ -135,9 +140,10 @@ curl -X POST http://localhost:8080/decks \
 Resposta: `201 Created` com `DeckSummaryDTO` (`id`, `title`, `language`, `difficultyLevel`).
 
 ## Gerar um deck via IA (`POST /decks/generate`) — **ROLE_ADMIN**
-Dispara a geração completa: Java chama o `python-services`, que gera texto (OpenAI/Gemini),
+Dispara a geração completa: Java chama o `python-services`, que gera texto (OpenAI),
 busca imagem (Pexels) e sintetiza áudio (Edge-TTS) pra cada card; o Java baixa essa mídia e
-persiste tudo (ver `docs/ARCHITECTURE.md`, seção 6).
+persiste tudo (ver `docs/ARCHITECTURE.md`, seção 7). Sem `OPENAI_API_KEY` configurada no
+`python-services`, cai num `MOCK_RESPONSE` fixo (sem mídia) em vez de chamar o LLM.
 
 *Constraints* (`DeckGenerateDTO`): `topic` (obrigatório, máx. 200), `language` (obrigatório,
 máx. 50), `difficultyLevel` (opcional, máx. 50).
