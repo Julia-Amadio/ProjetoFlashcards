@@ -18,13 +18,11 @@ remover ou implementar o endpoint quando alguém for mexer ali.
 Esse é o gap real de hoje. O backend suporta tudo abaixo, mas a interface não chama nada disso:
 
 - [x] Tela/ação de admin para gerar deck via IA (`POST /decks/generate`).
-- [ ] Telas de admin para CRUD de decks e flashcards — CRUD de decks concluído; CRUD de flashcards
-  continua pendente.
+- [x] Telas de admin para CRUD de decks e flashcards (criar, editar e remover).
 - [x] Renderizar imagem e áudio dos flashcards (`GET /flashcards/{id}/image`, `.../audio/word`,
   `.../audio/sentence`) — a tela de estudo exibe a imagem, reproduz os dois áudios e a preferência
   `autoplayAudio` usa o áudio real da palavra, mantendo a síntese do navegador como fallback.
-- [ ] Adicionar as funções de administração correspondentes em `lib/api.ts` (mídia, geração via IA
-  e CRUD de decks já existem; ainda faltam as funções de CRUD de flashcards).
+- [x] Adicionar as funções de administração correspondentes em `lib/api.ts`.
 - [ ] Adicionar o frontend ao Docker Compose ou documentar o modelo de deploy separado quando essa
   decisão for tomada.
 - [ ] Adicionar testes automatizados da interface e do cliente HTTP.

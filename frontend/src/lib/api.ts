@@ -154,6 +154,31 @@ export const api = {
   listFlashcards: (deckId: number, token: string, signal?: AbortSignal) =>
     request<ApiFlashcard[]>(`/decks/${deckId}/flashcards`, { signal }, token),
 
+  createFlashcard: (
+    deckId: number,
+    token: string,
+    data: Omit<ApiFlashcard, 'id'>,
+  ) =>
+    request<ApiFlashcard>(
+      `/decks/${deckId}/flashcards`,
+      { method: 'POST', body: JSON.stringify(data) },
+      token,
+    ),
+
+  updateFlashcard: (
+    flashcardId: number,
+    token: string,
+    data: Partial<Omit<ApiFlashcard, 'id'>>,
+  ) =>
+    request<ApiFlashcard>(
+      `/flashcards/${flashcardId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+      token,
+    ),
+
+  deleteFlashcard: (flashcardId: number, token: string) =>
+    request<void>(`/flashcards/${flashcardId}`, { method: 'DELETE' }, token),
+
   getFlashcardImage: (flashcardId: number, token: string, signal?: AbortSignal) =>
     requestMedia(`/flashcards/${flashcardId}/image`, token, signal),
 

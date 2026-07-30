@@ -1,4 +1,4 @@
-import { BookOpen, Check, Layers3, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react'
+import { BookOpen, Check, Layers3, LibraryBig, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { PageState } from '../components/PageState'
 import { useAuth } from '../context/AuthContext'
@@ -178,6 +178,7 @@ export function AdminDecksPage({ navigate }: { navigate: (path: string) => void 
                   <div><h3>{deck.title}</h3><p>{deck.language}{deck.difficultyLevel ? ` · ${deck.difficultyLevel}` : ''}</p></div>
                   <div className="admin-deck-actions">
                     <button className="icon-button" onClick={() => navigate(`/study/${deck.id}`)} aria-label={`Abrir ${deck.title}`}><BookOpen /></button>
+                    <button className="icon-button" onClick={() => navigate(`/admin/decks/${deck.id}/flashcards`)} aria-label={`Gerenciar flashcards de ${deck.title}`}><LibraryBig /></button>
                     <button className="icon-button" onClick={() => edit(deck)} aria-label={`Editar ${deck.title}`}><Pencil /></button>
                     <button className="icon-button danger-button" onClick={() => remove(deck)} disabled={deletingId === deck.id} aria-label={`Excluir ${deck.title}`}><Trash2 /></button>
                   </div>
