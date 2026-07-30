@@ -158,6 +158,10 @@ MOCK_RESPONSE = {
 def read_root():
     return {"status": "AI Service running"}
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 @app.post("/generate", response_model=GenerateResponse)
 def generate_cards(req: GenerateRequest, request: Request, _token: None = Depends(verify_internal_token)):
     api_key = os.getenv("OPENAI_API_KEY")

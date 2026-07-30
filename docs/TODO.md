@@ -17,17 +17,7 @@ _Nenhuma task pendente no backend._
 
 ## python-services (Python / FastAPI)
 
-- [ ] Adaptar `llm_agent.py` + `gerador_apkg.py` + `buscador_imagens.py` + `gerador_audio.py`
-  para trabalharem via FastAPI com uma resposta unificada. Direção decidida:
-  - Resposta unificada (genérica, não específica por idioma)
-  - Python baixa imagem (Pexels) e gera áudio (Edge-TTS) inline
-  - Retorna URLs temporárias de mídia no JSON
-  - Java faz download dos bytes e armazena em bytea no PostgreSQL (ver ADR-0001)
-- [ ] `.env`/`.env.example` próprio do serviço (hoje não existe nenhum — o `env_file` no compose
-  foi marcado como opcional só pra não travar o build enquanto isso).
-- [ ] Decidir se vale implementar o segredo compartilhado entre Java e Python (defesa em
-  profundidade, ver "mudanças futuras" na seção 6 do `ARCHITECTURE.md`).
-- [ ] Avaliar se vale a pena uma rota `/health` dedicada, já que hoje o healthcheck do Dockerfile
+- [x] Avaliar se vale a pena uma rota `/health` dedicada, já que hoje o healthcheck do Dockerfile
   só bate na rota `/` genérica.
 
 ## Backend (Java / Spring Boot) — como consequência do item acima
@@ -71,3 +61,11 @@ _Nenhuma task pendente no backend._
   estruturado alinhado ao contrato Java
 - Validação da resposta do LLM com Pydantic no `python-services` (camada 1 da validação em duas camadas)
 - ADR-0001: Mídia de flashcards armazenada como `bytea` no PostgreSQL (docs/adr/0001-media-storage.md)
+- Adaptar `llm_agent.py` + `gerador_apkg.py` + `buscador_imagens.py` + `gerador_audio.py`
+  para trabalharem via FastAPI com uma resposta unificada. Direção decidida:
+  - Resposta unificada (genérica, não específica por idioma)
+  - Python baixa imagem (Pexels) e gera áudio (Edge-TTS) inline
+  - Retorna URLs temporárias de mídia no JSON
+  - Java faz download dos bytes e armazena em bytea no PostgreSQL (ver ADR-0001)
+- [ ] `.env`/`.env.example` próprio do serviço (`env_file` no compose e funcionando).  
+- [ ] Segredo compartilhado entre Java e Python implementado.
