@@ -142,3 +142,54 @@ Extended the `/generate` flow to fetch images from Pexels and generate TTS audio
 tests/test_main.py ..............
 14 passed in 0.85s
 ```
+
+---
+
+## Ticket 4 — Java: Media persistence and serving endpoints
+
+### What was built
+
+Persists media bytes in PostgreSQL and serves them via dedicated endpoints — the final slice making the full pipeline work end-to-end.
+
+The `GenerateService` now HTTP-GETs each `image_url`, `audio_word_url`, and `audio_sentence_url` from the Python service and stores the raw bytes as `byte[]` in the `Flashcard` entity. Three new endpoints serve the stored bytes with correct Content-Type headers.
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `backend/src/main/resources/db/migration/V8__add_media_data_columns.sql` | New — drops `image_url`, `audio_word_url`, `audio_sentence_url` (varchar); adds `image_data`, `audio_word_data`, `audio_sentence_data` (bytea) + `image_mime_type` (varchar) |
+| `backend/src/main/java/.../model/Flashcard.java` | Replaced `String imageUrl`/`audioWordUrl`/`audioSentenceUrl` → `byte[] imageData`/`audioWordData`/`audioSentenceData` + `String imageMimeType`; updated getters/setters |
+| `backend/src/main/java/.../service/GenerateService.java` | Changed from storing URL strings to HTTP-GETting media bytes; added `downloadMedia()` and `detectImageMimeType()` helpers; added logger |
+| `backend/src/main/java/.../controller/FlashcardController.java` | Injected `FlashcardRepository`; added `GET /flashcards/{id}/image`, `GET /flashcards/{id}/audio/word`, `GET /flashcards/{id}/audio/sentence` |
+
+### Key decisions
+
+- **Media download failures are non-fatal**: If fetching an image or audio file fails (network error, Python 404, etc.), `downloadMedia` returns `null` and the card is persisted without that media. A warning is logged. This matches how the Python side handles Pexels/TTS failures — the card is still saved.
+- **MIME type from URL extension**: The `detectImageMimeType` helper maps `.jpg`/`.jpeg` → `image/jpeg`, `.png` → `image/png`, etc. Audio is hardcoded as `audio/mpeg` (Edge-TTS output). Using the response Content-Type header would be more robust but requires a full `ResponseEntity<byte[]>` download; extension-based is simpler for a POC.
+- **Repository injected into controller**: The three media endpoints bypass `FlashcardService` and call `FlashcardRepository.findById()` directly. This avoids adding entity-returning methods to the service layer. A minor layering trade-off (see code review below).
+- **Flyway migration is destructive**: The old `image_url`/`audio_word_url`/`audio_sentence_url` columns are dropped (they contained nulls in all existing rows). If data preservation were needed, a multi-step migration would be required.
+
+### Code review findings
+
+Two-axis review against `HEAD` (pre-ticket-4 state) was run after implementation.
+
+**Standards** (baseline smells, no repo-specific coding standards documented):
+
+| Smell | Location | Detail |
+|-------|----------|--------|
+| Duplicated Code | `FlashcardController.java:55–99` | Three media endpoints are nearly identical — same find-by-id + null-check + build-response pattern. Extract into a single `getMedia(id, fieldExtractor, contentType)` helper. |
+| Speculative Generality | `GenerateService.java:86–93` | `downloadMedia` catches `Exception` broadly and silently returns null on any failure. Transient network errors and genuine missing URLs both collapse into the same silent path. Consider catching specific exceptions (`HttpClientErrorException`, `ResourceAccessException`) separately. |
+| Primitive Obsession | `GenerateService.java:96–104` | MIME type detection is an if-cascade on file-extension strings. Extract to a `Map<String, String>` lookup or a dedicated utility class. |
+
+**Spec** (against `.scratch/python-services-unification/issues/04-java-media-persistence.md`):
+
+| Finding | Detail |
+|---------|--------|
+| ✅ All requirements implemented | Flyway migration, entity changes, GenerateService media download, and three media-serving endpoints — all present. |
+| ⚠️ Layering inconsistency | The new endpoints inject `FlashcardRepository` directly instead of delegating to `FlashcardService`. The existing pattern in this controller delegates to the service layer; the new endpoints break that convention. Not a spec defect (the spec only asked for endpoints), but a codebase consistency concern. |
+
+### Verification
+
+- `mvn compile` — passed
+- `mvn test` — passed (Flyway V8 migrated successfully on live Neon DB, context loads)
+- Flyway validated new entity mapping against the database schema
