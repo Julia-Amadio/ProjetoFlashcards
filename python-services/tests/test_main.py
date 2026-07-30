@@ -2,7 +2,9 @@ import os
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from main import app, _map_card_to_unified
+from modulos.internal_auth import verify_internal_token
 
+app.dependency_overrides[verify_internal_token] = lambda: None
 client = TestClient(app)
 
 
@@ -337,6 +339,21 @@ def test_generate_media_termo_busca_fallback(mock_gerar, mock_getenv, mock_audio
     mock_imagem.assert_called_once()
     args, _ = mock_imagem.call_args
     assert args[0] == "fish"
+
+
+def test_generate_unauthorized_without_token():
+    app.dependency_overrides.pop(verify_internal_token, None)
+    os.environ["INTERNAL_SECRET"] = "test-secret"
+    try:
+        response = client.post("/generate", json={
+            "topic": "Test",
+            "language": "english",
+        })
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid internal token"
+    finally:
+        del os.environ["INTERNAL_SECRET"]
+        app.dependency_overrides[verify_internal_token] = lambda: None
 
 
 def test_map_english():

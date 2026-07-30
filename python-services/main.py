@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from modulos.llm_agent import gerar_flashcards_json
 from modulos.buscador_imagens import baixar_imagem_para_arquivo
 from modulos.gerador_audio import gerar_audio_local
+from modulos.internal_auth import verify_internal_token
 from modulos.language_config import get_language_config
 
 load_dotenv()
@@ -158,7 +159,7 @@ def read_root():
     return {"status": "AI Service running"}
 
 @app.post("/generate", response_model=GenerateResponse)
-def generate_cards(req: GenerateRequest, request: Request):
+def generate_cards(req: GenerateRequest, request: Request, _token: None = Depends(verify_internal_token)):
     api_key = os.getenv("OPENAI_API_KEY")
     if api_key:
         try:

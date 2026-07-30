@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -25,13 +27,16 @@ public class GenerateService {
     private final FlashcardRepository flashcardRepository;
     private final SecurityUtils securityUtils;
     private final String pythonServiceUrl;
+    private final String internalSecret;
 
     public GenerateService(@Value("${app.python-service.url}") String pythonServiceUrl,
+                           @Value("${app.internal-secret}") String internalSecret,
                            DeckRepository deckRepository,
                            FlashcardRepository flashcardRepository,
                            SecurityUtils securityUtils) {
         this.restTemplate = new RestTemplate();
         this.pythonServiceUrl = pythonServiceUrl;
+        this.internalSecret = internalSecret;
         this.deckRepository = deckRepository;
         this.flashcardRepository = flashcardRepository;
         this.securityUtils = securityUtils;
@@ -41,9 +46,14 @@ public class GenerateService {
     public DeckSummaryDTO generate(DeckGenerateDTO dto) {
         var author = securityUtils.getAuthenticatedUser();
 
+        var headers = new HttpHeaders();
+        if (internalSecret != null && !internalSecret.isBlank()) {
+            headers.set("X-Internal-Token", internalSecret);
+        }
+        var requestEntity = new HttpEntity<>(dto, headers);
         var pythonResponse = restTemplate.postForObject(
                 pythonServiceUrl + "/generate",
-                dto,
+                requestEntity,
                 PythonDeckResponse.class
         );
 
