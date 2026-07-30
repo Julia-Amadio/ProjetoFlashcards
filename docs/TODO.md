@@ -35,6 +35,12 @@ que só importa na hora do deploy.
 
 ## Infra / Docker
 
+- [ ] Tornar `backend/.env` opcional para o cenário local ou versionar um
+  `backend/.env.example`. Hoje o caminho continua obrigatório e, ao mesmo tempo, suas variáveis
+  são sobrescritas pelo bloco `environment`; alinhar essa precedência para existir uma única
+  fonte de configuração clara.
+- [ ] Reavaliar se o container `postgres` precisa subir quando `DB_URL` aponta pro Neon. Hoje ele
+  sempre sobe e participa do `depends_on`, mesmo quando não é utilizado.
 - [ ] Reavaliar a exposição pública da porta `8000` do `python-services` antes de qualquer deploy
   real (documentado como mudança futura na seção 6 do `ARCHITECTURE.md`, não aplicado ainda).
 - [ ] Avaliar (no audit de segurança pré-deploy) como as credenciais são expostas via env var: hoje

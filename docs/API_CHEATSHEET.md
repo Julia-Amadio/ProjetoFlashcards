@@ -62,9 +62,9 @@ Rota pública — é assim que qualquer pessoa vira `ROLE_USER`.
 
 *Constraints* (`UserCreateDTO`):
 * **Nenhum** campo pode ser vazio;
-* O **nome** deve ter entre 3 e 50 caracteres, e só pode conter letras, números, ponto, traço e
-  underline (`^[a-zA-Z0-9._-]+$`);
-* O **e-mail** deve ter formato válido e ser único (já cadastrado retorna erro);
+* O **nome** deve ter entre 3 e 50 caracteres, ser único e só pode conter letras, números, ponto,
+  traço e underline (`^[a-zA-Z0-9._-]+$`);
+* O **e-mail** deve ter formato válido e ser único;
 * A **senha** deve ter no mínimo 8 caracteres, com ao menos uma maiúscula, uma minúscula e um
   número (`^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).*$`).
 ```bash
@@ -90,17 +90,20 @@ Resposta: `200 OK` com objeto de página do Spring (`content`, `totalElements`, 
 — o array de usuários fica em `content`).
 
 ## Buscar usuário específico por `UUID` (`GET /users/{id}`)
-Substitua `SEU-UUID-AQUI` pelo UUID real de um usuário (retornado no cadastro/login). Exige que o
-token pertença ao **próprio usuário** ou a um `ROLE_ADMIN` (ver `SecurityUtils.validatePermissions`)
-— qualquer outra combinação retorna `403`.
+Substitua `SEU-UUID-AQUI` pelo UUID real de um usuário. Exige que o token pertença ao
+**próprio usuário** ou a um `ROLE_ADMIN` (ver `SecurityUtils.validatePermissions`) — qualquer
+outra combinação retorna `403`.
 ```bash
 curl -X GET http://localhost:8080/users/SEU-UUID-AQUI \
      -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
 ```
+Resposta: `200 OK` com `UserResponseDTO`, ou `404 Not Found` se o usuário não existir.
 
 ## Atualizar usuário por `UUID` (`PUT /users/{id}`)
 Mesma regra de permissão do endpoint acima (dono do recurso ou `ROLE_ADMIN`). Todos os campos são
-opcionais — envie só o que quiser alterar (`null`/omitido mantém o valor atual).
+opcionais — envie só o que quiser alterar (`null`/omitido mantém o valor atual). Nome e e-mail
+continuam sujeitos às regras de unicidade; senha, nome e e-mail enviados são validados com as
+mesmas restrições do cadastro.
 ```bash
 curl -X PUT http://localhost:8080/users/SEU-UUID-AQUI \
      -H "Content-Type: application/json" \
@@ -255,17 +258,15 @@ ao próprio `userId` da URL, ou ser de um `ROLE_ADMIN`.
 curl -X POST http://localhost:8080/users/SEU-UUID-AQUI/favorites/1 \
      -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
 ```
-Resposta: `200 OK` sem corpo. Chamar de novo com o mesmo `deckId` é idempotente do ponto de vista
-de resultado (Hibernate gerencia a coleção via `Set`), mas depende de `deckId` existir — caso
-contrário, retorna erro (`Deck não encontrado`).
+Resposta: `200 OK` sem corpo. Chamar novamente com o mesmo `deckId` mantém um único vínculo porque
+a coleção é um `Set` e a tabela usa chave primária composta. O usuário e o deck precisam existir.
 
 ## Listar decks favoritos (`GET /users/{userId}/favorites`)
 ```bash
 curl -X GET http://localhost:8080/users/SEU-UUID-AQUI/favorites \
      -H "Authorization: Bearer INSIRA_TOKEN_AQUI"
 ```
-Resposta: `200 OK` com uma lista de `DeckSummaryDTO` (`id`, `title`, `language`,
-`difficultyLevel` — nunca o autor completo ou a data de criação).
+Resposta: `200 OK` com uma lista de `DeckSummaryDTO`.
 
 ## Remover um deck dos favoritos (`DELETE /users/{userId}/favorites/{deckId}`)
 ```bash

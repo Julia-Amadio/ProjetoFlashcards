@@ -22,10 +22,10 @@ ProjetoFlashcards/
 ├── .scratch/                 # issues e specs locais (markdown)
 ├── docker-compose.yml        # orquestra backend + python-services, único cenário de execução
 ├── backend/
-│   ├── src.main.java.com.projflashcards.backend/    # backend do projeto construído com Spring Boot
-│   ├── resources/
-│   │   ├── db.migration/             # migrações Flyway
-│   │   └── application.properties    # configurações do Spring Boot (conexão BD, comportamentos, etc.)
+│   ├── src/main/java/com/projflashcards/backend/    # backend construído com Spring Boot
+│   ├── src/main/resources/
+│   │   ├── db/migration/             # migrações Flyway
+│   │   └── application.properties    # conexão com BD, JWT, JPA e Swagger
 │   ├── Dockerfile            # build multi-stage do backend (Maven -> JRE)
 │   └── pom.xml               # dependências do backend, gerenciadas pelo Maven
 ├── frontend/
@@ -44,8 +44,8 @@ ProjetoFlashcards/
 O projeto utiliza uma arquitetura de **Sistema Distribuído**, projetada para separar 
 responsabilidades e otimizar recursos. Ela é dividida em três frentes principais:
 
-- **Frontend (React):** interface do usuário onde o estudante pratica os cards e 
-o administrador gerencia os decks.
+- **Frontend (React):** interface do usuário onde o estudante cria a conta, consulta o catálogo
+de decks e pratica os cartões demonstrativos.
 - **Backend principal (Spring Boot):** o "cérebro" monolítico do negócio. Gerencia 
 de forma centralizada os usuários, segurança (JWT), progresso de aprendizado e persiste 
 os dados no banco PostgreSQL.
@@ -56,9 +56,9 @@ pronúncia via Edge-TTS. Retorna ao Java um JSON unificado com campos de texto +
 temporárias de mídia; o Java faz o download dos bytes e persiste tudo no PostgreSQL 
 (ver ADR-0001). Isola a complexidade das APIs externas do backend principal.
 
-Essa separação garante que, caso as APIs externas (OpenAI/Pexels) fiquem indisponíveis, 
-o sistema principal continua no ar, permitindo que os estudantes continuem revisando os 
-flashcards já existentes.
+Essa separação também evita que uma indisponibilidade da OpenAI/Pexels derrube autenticação,
+catálogo ou favoritos. Hoje essa independência é ainda mais direta: o backend depende do container
+Python estar iniciado, mas nenhuma rota Java implementada chama o serviço de IA.
 
 ### Execução: um único cenário, sempre contra o Neon
 Todo o sistema sobe por um único `docker-compose.yml`, apontando sempre pro banco na nuvem (Neon) —
@@ -128,7 +128,38 @@ retornando um erro amigável antes mesmo de tentar salvar no banco.
 
 ---
 
-## 4. Detalhamento da arquitetura de pacotes
+## 4. Stack - Frontend React
+O frontend é uma SPA sem biblioteca de roteamento. `App.tsx` observa
+`window.location.pathname`, atualiza o histórico com `pushState` e distribui as páginas
+manualmente.
+
+### O que já conversa com o backend
+* `POST /users`: cadastro;
+* `POST /login`: login e obtenção do JWT;
+* `GET /decks`: catálogo exibido no dashboard.
+
+O cliente usa `/api` por padrão. Durante o desenvolvimento, o proxy do Vite remove esse prefixo
+e encaminha a requisição para `http://localhost:8080`. Em outro ambiente,
+`VITE_API_URL` substitui a URL base.
+
+### O que ainda é local/demonstrativo
+* `frontend/src/data/decks.ts` contém os decks e cartões usados pela tela `/study/{id}`;
+* favoritos da interface ficam em `karta.favorites.{email}`;
+* preferências ficam em `karta.preferences.{email}`;
+* progresso de cada deck fica em `karta.study.{email}.{deckId}`;
+* a sessão JWT fica em `karta.session`.
+
+Isso cria uma diferença importante: o dashboard lista qualquer deck existente no PostgreSQL,
+mas a tela de estudo só reconhece os IDs `1`, `2` e `3` definidos nos dados demonstrativos. Os
+endpoints de favoritos do backend existem, porém o frontend ainda não os chama.
+
+O JWT é lido no navegador para verificar a claim `exp`. Ao expirar — ou quando uma chamada
+autenticada devolve `401` — a sessão local é removida e a tela de login informa que é necessário
+entrar novamente.
+
+---
+
+## 5. Detalhamento da arquitetura de pacotes
 A estrutura de pacotes foi desenhada seguindo o padrão de Arquitetura em Camadas,
 visando o desacoplamento e a facilidade de manutenção.
 
@@ -149,6 +180,12 @@ Onde reside a verdade sobre as regras de negócio de cada entidade em particular
       não altere dados de outro;
     * Define as regras do corpo de requisição das rotas presentes no `controller`, garantindo a
       integridade dos dados inseridos/alterados no banco e gerenciando o ciclo de vida da entidade.
+* `DeckService`:
+    * Usa o usuário autenticado como autor ao criar um deck;
+    * Lista/busca decks e os converte para `DeckSummaryDTO`.
+* `UserFavoriteService`:
+    * Valida se o usuário autenticado é dono do recurso ou administrador;
+    * Gerencia a relação muitos-para-muitos persistida em `user_favorite_decks`.
 
 ### 📂 `com.projflashcards.backend.security`
 Este é o pacote "transversal" do sistema. Ele não lida com regras de negócio de flashcards,
@@ -180,7 +217,7 @@ contrato com o Frontend (React), além de evitar a exposição de dados sensíve
 
 ---
 
-## 5. Diagramação auxiliar
+## 6. Diagramação auxiliar
 
 ### Fase 1: o trabalho do Maven (*build* e compilação)
 Antes de executar, o código legível para humanos precisa ser traduzido e empacotado. **O Maven
@@ -287,7 +324,7 @@ graph TD
 
 ---
 
-## 6. Fluxo de geração de flashcards via IA: quem converte o quê
+## 7. Integração do serviço de IA para geração de flashcards
 
 Uma dúvida recorrente ao desenhar a comunicação Java ↔ Python: já que os dois módulos
 **poderiam** transformar o JSON cru devolvido pelo LLM no formato final, qual dos dois deve
