@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AppShell } from './components/AppShell'
 import { useAuth } from './context/AuthContext'
+import { AdminDecksPage } from './pages/AdminDecksPage'
 import { AuthPage } from './pages/AuthPage'
 import { GenerateDeckPage } from './pages/GenerateDeckPage'
 import { Dashboard } from './pages/Dashboard'
@@ -20,6 +21,7 @@ export default function App() {
       '/': 'Karta — Visão geral',
       '/favorites': 'Karta — Favoritos',
       '/admin/generate': 'Karta — Gerar deck',
+      '/admin/decks': 'Karta — Gerenciar decks',
       '/settings': 'Karta — Configurações',
       '/login': 'Karta — Entrar',
       '/register': 'Karta — Criar conta',
@@ -32,13 +34,15 @@ export default function App() {
   const studyMatch = authenticatedRoute.match(/^\/study\/(\d+)\/?$/)
   if (studyMatch) return <StudyPage deckId={Number(studyMatch[1])} navigate={navigate} />
   const canGenerate = session.user?.role === 'ROLE_ADMIN'
-  const knownPages = ['/', '/favorites', '/settings', ...(canGenerate ? ['/admin/generate'] : [])]
+  const knownPages = ['/', '/favorites', '/settings', ...(canGenerate ? ['/admin/generate', '/admin/decks'] : [])]
   const page = authenticatedRoute === '/favorites'
     ? 'favorites'
     : authenticatedRoute === '/settings'
       ? 'settings'
       : authenticatedRoute === '/admin/generate'
         ? 'generate'
+        : authenticatedRoute === '/admin/decks'
+          ? 'manage-decks'
         : authenticatedRoute === '/'
           ? 'home'
           : 'not-found'
@@ -49,6 +53,8 @@ export default function App() {
         ? <SettingsPage navigate={navigate} />
         : page === 'generate'
           ? <GenerateDeckPage navigate={navigate} />
+        : page === 'manage-decks'
+          ? <AdminDecksPage navigate={navigate} />
         : <Dashboard navigate={navigate} favoritesOnly={page === 'favorites'} />}
   </AppShell>
 }

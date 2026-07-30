@@ -117,6 +117,16 @@ export const api = {
   getDeck: (id: number, token: string, signal?: AbortSignal) =>
     request<DeckSummary>(`/decks/${id}`, { signal }, token),
 
+  createDeck: (
+    token: string,
+    data: { title: string; description?: string; language: string; difficultyLevel?: string },
+  ) =>
+    request<DeckSummary>(
+      '/decks',
+      { method: 'POST', body: JSON.stringify(data) },
+      token,
+    ),
+
   generateDeck: (
     token: string,
     data: { topic: string; language: string; difficultyLevel?: string },
