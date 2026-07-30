@@ -1,6 +1,7 @@
 package com.projflashcards.backend.service;
 
 import com.projflashcards.backend.dto.*;
+import com.projflashcards.backend.exception.ExternalServiceException;
 import com.projflashcards.backend.model.Deck;
 import com.projflashcards.backend.model.Flashcard;
 import com.projflashcards.backend.repository.DeckRepository;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -51,14 +54,27 @@ public class GenerateService {
             headers.set("X-Internal-Token", internalSecret);
         }
         var requestEntity = new HttpEntity<>(dto, headers);
-        var pythonResponse = restTemplate.postForObject(
-                pythonServiceUrl + "/generate",
-                requestEntity,
-                PythonDeckResponse.class
-        );
+        PythonDeckResponse pythonResponse;
+        try {
+            pythonResponse = restTemplate.postForObject(
+                    pythonServiceUrl + "/generate",
+                    requestEntity,
+                    PythonDeckResponse.class
+            );
+        } catch (HttpStatusCodeException e) {
+            //python-services respondeu, mas com erro (ex.: 502 por falha na OpenAI/Pexels/Edge-TTS).
+            //O corpo da resposta já vem com o detalhe (ver main.py: HTTPException(detail=...)).
+            log.warn("python-services devolveu erro em /generate: {}", e.getResponseBodyAsString());
+            throw new ExternalServiceException("Falha ao gerar deck via IA: " + e.getResponseBodyAsString());
+        } catch (RestClientException e) {
+            //Nem chegou a ter resposta HTTP — conexão recusada, timeout, DNS, etc.
+            log.warn("Não foi possível conectar ao python-services em /generate", e);
+            throw new ExternalServiceException(
+                    "Não foi possível conectar ao serviço de geração (python-services). Verifique se ele está no ar.");
+        }
 
         if (pythonResponse == null || pythonResponse.cards() == null || pythonResponse.cards().isEmpty()) {
-            throw new RuntimeException("Python service returned empty response");
+            throw new ExternalServiceException("O serviço de geração devolveu uma resposta vazia.");
         }
 
         var deck = new Deck(pythonResponse.deckTitle(), pythonResponse.description(),
