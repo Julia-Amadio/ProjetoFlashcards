@@ -11,7 +11,7 @@ Adapt the `llm_agent.py` pipeline to work through the FastAPI `/generate` endpoi
 | 1 | Python: Unified text-only generation via llm_agent | ✅ Done | Text fields mapped, llm_agent integrated, tests passing |
 | 2 | Java: Adapt DTOs for new Python response schema | ✅ Done | Added `imageUrl`, `audioWordUrl`, `audioSentenceUrl` to `PythonCardResponse` record; wired them via setters in `GenerateService` |
 | 3 | Python: Media pipeline (images + audio) | ✅ Done | Pexels image download + Edge-TTS audio integrated; StaticFiles mount for serving; tests passing |
-| 4 | Java: Media persistence and serving endpoints | ⏳ Pending | |
+| 4 | Java: Media persistence and serving endpoints | ✅ Done | Flyway V8 migration; entity fields replaced with byte[]; GenerateService downloads media from Python URLs; 3 media-serving endpoints added; compilation and context-load test passing |
 
 ---
 

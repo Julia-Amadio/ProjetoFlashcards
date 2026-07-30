@@ -6,6 +6,8 @@ import com.projflashcards.backend.model.Flashcard;
 import com.projflashcards.backend.repository.DeckRepository;
 import com.projflashcards.backend.repository.FlashcardRepository;
 import com.projflashcards.backend.security.SecurityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +17,8 @@ import java.util.List;
 
 @Service
 public class GenerateService {
+
+    private static final Logger log = LoggerFactory.getLogger(GenerateService.class);
 
     private final RestTemplate restTemplate;
     private final DeckRepository deckRepository;
@@ -58,9 +62,16 @@ public class GenerateService {
                     c.nativeTranslation(), c.partOfSpeech(), c.targetSentence(),
                     c.sentencePhonetic(), c.sentenceTranslation()
             );
-            card.setImageUrl(c.imageUrl());
-            card.setAudioWordUrl(c.audioWordUrl());
-            card.setAudioSentenceUrl(c.audioSentenceUrl());
+
+            byte[] imageBytes = downloadMedia(c.imageUrl());
+            if (imageBytes != null) {
+                card.setImageData(imageBytes);
+                card.setImageMimeType(detectImageMimeType(c.imageUrl()));
+            }
+
+            card.setAudioWordData(downloadMedia(c.audioWordUrl()));
+            card.setAudioSentenceData(downloadMedia(c.audioSentenceUrl()));
+
             return flashcardRepository.save(card);
         }).toList();
 
@@ -70,5 +81,25 @@ public class GenerateService {
                 finalDeck.getLanguage(),
                 finalDeck.getDifficultyLevel()
         );
+    }
+
+    private byte[] downloadMedia(String url) {
+        if (url == null || url.isBlank()) return null;
+        try {
+            return restTemplate.getForObject(url, byte[].class);
+        } catch (Exception e) {
+            log.warn("Failed to download media from {}: {}", url, e.getMessage());
+            return null;
+        }
+    }
+
+    private String detectImageMimeType(String url) {
+        if (url == null) return null;
+        String lower = url.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".gif")) return "image/gif";
+        if (lower.endsWith(".webp")) return "image/webp";
+        return "application/octet-stream";
     }
 }

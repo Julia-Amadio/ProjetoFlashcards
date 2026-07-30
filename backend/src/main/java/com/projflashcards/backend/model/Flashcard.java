@@ -36,14 +36,17 @@ public class Flashcard {
     @Column(name = "sentence_translation", columnDefinition = "TEXT")
     private String sentenceTranslation;
 
-    @Column(name = "image_url", length = 255)
-    private String imageUrl;
+    @Column(name = "image_data")
+    private byte[] imageData;
 
-    @Column(name = "audio_word_url", length = 255)
-    private String audioWordUrl;
+    @Column(name = "audio_word_data")
+    private byte[] audioWordData;
 
-    @Column(name = "audio_sentence_url", length = 255)
-    private String audioSentenceUrl;
+    @Column(name = "audio_sentence_data")
+    private byte[] audioSentenceData;
+
+    @Column(name = "image_mime_type", length = 50)
+    private String imageMimeType;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -79,9 +82,10 @@ public class Flashcard {
     public String getTargetSentence() { return targetSentence; }
     public String getSentencePhonetic() { return sentencePhonetic; }
     public String getSentenceTranslation() { return sentenceTranslation; }
-    public String getImageUrl() { return imageUrl; }
-    public String getAudioWordUrl() { return audioWordUrl; }
-    public String getAudioSentenceUrl() { return audioSentenceUrl; }
+    public byte[] getImageData() { return imageData; }
+    public byte[] getAudioWordData() { return audioWordData; }
+    public byte[] getAudioSentenceData() { return audioSentenceData; }
+    public String getImageMimeType() { return imageMimeType; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 
     public void setTargetWord(String targetWord) { this.targetWord = targetWord; }
@@ -91,7 +95,8 @@ public class Flashcard {
     public void setTargetSentence(String targetSentence) { this.targetSentence = targetSentence; }
     public void setSentencePhonetic(String sentencePhonetic) { this.sentencePhonetic = sentencePhonetic; }
     public void setSentenceTranslation(String sentenceTranslation) { this.sentenceTranslation = sentenceTranslation; }
-    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
-    public void setAudioWordUrl(String audioWordUrl) { this.audioWordUrl = audioWordUrl; }
-    public void setAudioSentenceUrl(String audioSentenceUrl) { this.audioSentenceUrl = audioSentenceUrl; }
+    public void setImageData(byte[] imageData) { this.imageData = imageData; }
+    public void setAudioWordData(byte[] audioWordData) { this.audioWordData = audioWordData; }
+    public void setAudioSentenceData(byte[] audioSentenceData) { this.audioSentenceData = audioSentenceData; }
+    public void setImageMimeType(String imageMimeType) { this.imageMimeType = imageMimeType; }
 }
