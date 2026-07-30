@@ -27,11 +27,13 @@ O front lê a URL da API assim (`frontend/src/lib/api.ts`):
 ```ts
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 ```
-Isso é resolvido **no build**, não em runtime. Hoje o `.env.example` do front tem
-`VITE_API_URL=/api` (caminho relativo) — isso só funciona em dev graças ao proxy do Vite
-(`vite.config.ts`, que redireciona `/api` pra `localhost:8080`). **Esse proxy não existe no build
-de produção.** No build final, `VITE_API_URL` precisa ser a URL pública **completa** do backend
-já deployado (ex: `https://karta-backend.onrender.com`), nunca um caminho relativo.
+Isso é resolvido **no build**, não em runtime. No desenvolvimento, o proxy do Vite encaminha
+`/api` para `localhost:8080`. No Docker Compose, o Nginx do frontend também encaminha `/api`,
+desta vez para `backend:8080`, então o caminho relativo funciona nos dois cenários locais.
+
+Em uma hospedagem estática separada (Vercel/Netlify), esse Nginx não existe. Nesse caso,
+`VITE_API_URL` precisa ser a URL pública **completa** do backend já deployado
+(ex: `https://karta-backend.onrender.com`).
 
 ## 3. Ordem de deploy: 3 saltos, não 2
 

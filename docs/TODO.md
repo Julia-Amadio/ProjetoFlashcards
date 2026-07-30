@@ -23,8 +23,8 @@ Esse é o gap real de hoje. O backend suporta tudo abaixo, mas a interface não 
   `.../audio/sentence`) — a tela de estudo exibe a imagem, reproduz os dois áudios e a preferência
   `autoplayAudio` usa o áudio real da palavra, mantendo a síntese do navegador como fallback.
 - [x] Adicionar as funções de administração correspondentes em `lib/api.ts`.
-- [ ] Adicionar o frontend ao Docker Compose ou documentar o modelo de deploy separado quando essa
-  decisão for tomada.
+- [x] Adicionar o frontend ao Docker Compose (build multi-stage + Nginx com proxy `/api` e fallback
+  das rotas da SPA).
 - [ ] Adicionar testes automatizados da interface e do cliente HTTP.
 
 ## python-services (Python / FastAPI)

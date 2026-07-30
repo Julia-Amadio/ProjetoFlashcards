@@ -144,16 +144,15 @@ manualmente.
 * `GET`/`PUT /users/{userId}/preferences`: preferências do usuário.
 
 O cliente usa `/api` por padrão. Durante o desenvolvimento, o proxy do Vite remove esse prefixo
-e encaminha a requisição para `http://localhost:8080`. Em outro ambiente,
-`VITE_API_URL` substitui a URL base — precisa ser a URL pública completa em build de produção
+e encaminha a requisição para `http://localhost:8080`. No Docker Compose, o Nginx do frontend faz
+o mesmo encaminhamento para `backend:8080`. Em uma hospedagem estática separada,
+`VITE_API_URL` substitui a URL base e precisa ser a URL pública completa do backend
 (ver `docs/DEPLOY.md`).
 
-### O que ainda falta (só isso, ver `docs/TODO.md` para detalhes)
-* Ação de admin para gerar deck via IA (`POST /decks/generate`) — o backend já suporta, a
-  interface não chama;
-* Telas de admin para CRUD de decks/flashcards — mesma situação;
-* Renderizar imagem e áudio dos flashcards (`GET /flashcards/{id}/image`, `.../audio/word`,
-  `.../audio/sentence`) — endpoints prontos, nenhum componente os usa ainda.
+### O que ainda falta
+
+As integrações funcionais do frontend estão concluídas. A pendência atual é adicionar testes
+automatizados da interface e do cliente HTTP (ver `docs/TODO.md`).
 
 A sessão JWT continua persistida localmente (`karta.session`, em `localStorage`) — isso é
 esperado, não é um gap: o JWT é lido no navegador para verificar a claim `exp`, e ao expirar (ou

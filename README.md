@@ -43,9 +43,9 @@ Existem atualmente dois níveis de acesso (*roles*):
 
 ## Como Executar - Aplicação completa (Docker Compose)
 
-Backend e serviço Python sobem via Docker Compose, direto contra o banco na nuvem (Neon). Não é
-necessário ter Java, Maven, PostgreSQL ou Python instalados na máquina, só o Docker. O build das
-imagens acontece dentro dos containers.
+Frontend, backend e serviço Python sobem via Docker Compose, direto contra o banco na nuvem
+(Neon). Não é necessário ter Node, Java, Maven, PostgreSQL ou Python instalados na máquina, só o
+Docker. O build das imagens acontece dentro dos containers.
 
 ### Pré-requisitos
 
@@ -74,6 +74,7 @@ O `application.properties` só sabe conectar no banco se existir um `backend/.en
 
 Depois de subir, os serviços ficam disponíveis em:
 
+* Frontend (React + Nginx): `http://localhost:5173`
 * Backend (Spring Boot): `http://localhost:8080`
 * Swagger UI: `http://localhost:8080/swagger-ui/index.html` (liberado sem token em dev)
 * Python Services (FastAPI): `http://localhost:8000`
@@ -88,9 +89,9 @@ docker compose down
 
 ---
 
-## Como Executar - Frontend React
+## Como Executar - Frontend React em desenvolvimento
 
-O frontend fica em `frontend/` e roda fora do Compose atual:
+Para trabalhar no frontend com hot reload, ele também pode rodar fora do Compose:
 
 ```bash
 cd frontend
