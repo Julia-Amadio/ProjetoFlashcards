@@ -15,6 +15,7 @@ export type Session = {
 export type DeckSummary = {
   id: number
   title: string
+  description: string | null
   language: string
   difficultyLevel: string | null
 }

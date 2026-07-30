@@ -2,6 +2,7 @@ package com.projflashcards.backend.service;
 
 import com.projflashcards.backend.dto.DeckCreateDTO;
 import com.projflashcards.backend.dto.DeckSummaryDTO;
+import com.projflashcards.backend.dto.DeckUpdateDTO;
 import com.projflashcards.backend.exception.ResourceNotFoundException;
 import com.projflashcards.backend.model.Deck;
 import com.projflashcards.backend.repository.DeckRepository;
@@ -46,10 +47,32 @@ public class DeckService {
         return toSummary(deck);
     }
 
+    @Transactional
+    public DeckSummaryDTO update(Long id, DeckUpdateDTO dto) {
+        var deck = deckRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Deck não encontrado"));
+
+        if (dto.title() != null) deck.setTitle(dto.title());
+        if (dto.description() != null) deck.setDescription(dto.description());
+        if (dto.language() != null) deck.setLanguage(dto.language());
+        if (dto.difficultyLevel() != null) deck.setDifficultyLevel(dto.difficultyLevel());
+
+        return toSummary(deckRepository.save(deck));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        if (!deckRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Deck não encontrado");
+        }
+        deckRepository.deleteById(id);
+    }
+
     private DeckSummaryDTO toSummary(Deck deck) {
         return new DeckSummaryDTO(
                 deck.getId(),
                 deck.getTitle(),
+                deck.getDescription(),
                 deck.getLanguage(),
                 deck.getDifficultyLevel()
         );

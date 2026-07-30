@@ -5,6 +5,7 @@ package com.projflashcards.backend.dto;
 public record DeckSummaryDTO(
         Long id,
         String title,
+        String description,
         String language,
         String difficultyLevel
 ) {}

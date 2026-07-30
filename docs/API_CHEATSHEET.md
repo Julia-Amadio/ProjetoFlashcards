@@ -134,6 +134,28 @@ curl -X POST http://localhost:8080/decks \
 ```
 Resposta: `201 Created` com `DeckSummaryDTO` (`id`, `title`, `language`, `difficultyLevel`).
 
+## Atualizar um deck (`PUT /decks/{id}`) — **ROLE_ADMIN**
+Todos os campos são opcionais. Campos omitidos preservam o valor atual.
+
+```bash
+curl -X PUT http://localhost:8080/decks/1 \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer INSIRA_TOKEN_ADMIN_AQUI" \
+     -d '{ "title": "Saudações essenciais", "difficultyLevel": "A2" }'
+```
+
+Resposta: `200 OK` com `DeckSummaryDTO`.
+
+## Remover um deck (`DELETE /decks/{id}`) — **ROLE_ADMIN**
+A remoção também exclui flashcards, favoritos e progresso relacionados por cascade no banco.
+
+```bash
+curl -X DELETE http://localhost:8080/decks/1 \
+     -H "Authorization: Bearer INSIRA_TOKEN_ADMIN_AQUI"
+```
+
+Resposta: `204 No Content`.
+
 ## Gerar um deck via IA (`POST /decks/generate`) — **ROLE_ADMIN**
 Dispara a geração completa: Java chama o `python-services`, que gera texto (OpenAI/Gemini),
 busca imagem (Pexels) e sintetiza áudio (Edge-TTS) pra cada card; o Java baixa essa mídia e

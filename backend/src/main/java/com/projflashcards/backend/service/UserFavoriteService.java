@@ -76,6 +76,7 @@ public class UserFavoriteService {
                 .map(deck -> new DeckSummaryDTO(
                         deck.getId(),
                         deck.getTitle(),
+                        deck.getDescription(),
                         deck.getLanguage(),
                         deck.getDifficultyLevel()
                 ))
