@@ -1,0 +1,27 @@
+"# Nunca deixe segredos irem pro contexto de build nem pra imagem
+.env
+*.env
+
+# Build artifacts / cache Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Testes (não precisam ir pra imagem final)
+tests/
+test.py
+
+# IDE
+.idea/
+.vscode/
+
+# Sistema operacional
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
