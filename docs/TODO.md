@@ -15,7 +15,7 @@ remover ou implementar o endpoint quando alguém for mexer ali.
 
 ## Frontend (React / TypeScript)
 
-Esse é o gap real de hoje. O backend suporta tudo abaixo, mas a interface não chama nada disso:
+Checklist do frontend:
 
 - [x] Tela/ação de admin para gerar deck via IA (`POST /decks/generate`).
 - [x] Telas de admin para CRUD de decks e flashcards (criar, editar e remover).
@@ -25,8 +25,7 @@ Esse é o gap real de hoje. O backend suporta tudo abaixo, mas a interface não 
 - [x] Adicionar as funções de administração correspondentes em `lib/api.ts`.
 - [x] Adicionar o frontend ao Docker Compose (build multi-stage + Nginx com proxy `/api` e fallback
   das rotas da SPA).
-- [ ] Adicionar testes automatizados — cliente HTTP coberto com Vitest; testes dos componentes e
-  fluxos da interface continuam pendentes.
+- [x] Adicionar testes automatizados do cliente HTTP e dos principais fluxos da interface.
 
 ## python-services (Python / FastAPI)
 

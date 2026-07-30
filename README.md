@@ -5,9 +5,9 @@ cartões de memorização. O projeto possui autenticação JWT, gerenciamento de
 decks e flashcards (com CRUD completo para administradores), geração de decks via IA, favoritos,
 progresso de estudo e preferências — tudo persistido no backend.
 
-> ⚠️ **Aviso:** este projeto ainda está em **desenvolvimento**. O que falta hoje é
-> majoritariamente frontend: telas de admin para gerar deck via IA e gerenciar decks/flashcards, e
-> a renderização de imagem/áudio dos cards gerados. Veja `docs/TODO.md` para o detalhamento.
+> ⚠️ **Aviso:** este projeto ainda está em **desenvolvimento**. As funcionalidades do frontend
+> estão integradas e cobertas pelos principais testes automatizados; as pendências restantes são
+> de infraestrutura e preparação para um eventual deploy. Veja `docs/TODO.md`.
 
 ---
 
@@ -112,9 +112,8 @@ npm test
 
 Cadastro, login (com sessão JWT persistida), catálogo de decks, tela de estudo, favoritos,
 progresso de revisão e preferências já são integrados ao backend real — nada disso usa mais
-dados estáticos ou `localStorage` como fonte de verdade. O que ainda falta no frontend (geração
-de deck via IA, CRUD de admin, exibição de imagem/áudio dos cards) está detalhado em
-`docs/TODO.md`.
+dados estáticos ou `localStorage` como fonte de verdade. Geração via IA, CRUD administrativo e
+mídia dos flashcards também estão integrados.
 
 ---
 

@@ -149,10 +149,10 @@ o mesmo encaminhamento para `backend:8080`. Em uma hospedagem estática separada
 `VITE_API_URL` substitui a URL base e precisa ser a URL pública completa do backend
 (ver `docs/DEPLOY.md`).
 
-### O que ainda falta
+### Estado atual
 
-As integrações funcionais do frontend estão concluídas. A pendência atual é adicionar testes
-automatizados da interface e do cliente HTTP (ver `docs/TODO.md`).
+As integrações funcionais do frontend estão concluídas. O cliente HTTP e os principais fluxos da
+interface possuem testes automatizados com Vitest e Testing Library.
 
 A sessão JWT continua persistida localmente (`karta.session`, em `localStorage`) — isso é
 esperado, não é um gap: o JWT é lido no navegador para verificar a claim `exp`, e ao expirar (ou

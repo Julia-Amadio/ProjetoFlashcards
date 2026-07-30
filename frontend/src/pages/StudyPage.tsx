@@ -41,6 +41,8 @@ function toFlashcard(card: ApiFlashcard): StudyCard {
 
 export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (path: string) => void }) {
   const { session } = useAuth()
+  const token = session?.token
+  const userId = session?.user?.id
   const [state, setState] = useState<LoadState>('loading')
   const [deck, setDeck] = useState<StudyDeck | null>(null)
   const [cards, setCards] = useState<StudyCard[]>([])
@@ -49,10 +51,8 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
-    if (!session?.token || !session.user?.id) return
+    if (!token || !userId) return
     const controller = new AbortController()
-    const { token } = session
-    const userId = session.user.id
     setState('loading')
 
     Promise.all([
@@ -83,7 +83,7 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
       })
 
     return () => controller.abort()
-  }, [deckId, session?.token, session?.user?.id])
+  }, [deckId, token, userId])
 
   if (state === 'loading') {
     return <main className="study-page study-not-found">
@@ -97,7 +97,7 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
     </main>
   }
 
-  if (state !== 'ready' || !deck || !session?.token || !session.user?.id) {
+  if (state !== 'ready' || !deck || !token || !userId) {
     return <main className="study-page study-not-found">
       <PageState kind="error" title="Este estudo não está disponível" description={errorMessage || 'Volte à biblioteca para escolher um dos decks disponíveis.'} action={<button className="primary-button" onClick={() => navigate('/')}><ArrowLeft /> Voltar à biblioteca</button>} />
     </main>
@@ -106,8 +106,8 @@ export function StudyPage({ deckId, navigate }: { deckId: number; navigate: (pat
   return <StudySession
     deck={deck}
     cards={cards}
-    userId={session.user.id}
-    token={session.token}
+    userId={userId}
+    token={token}
     initialProgress={initialProgress}
     preferences={preferences}
     navigate={navigate}
