@@ -7,6 +7,8 @@ import com.projflashcards.backend.model.Flashcard;
 import com.projflashcards.backend.repository.DeckRepository;
 import com.projflashcards.backend.repository.FlashcardRepository;
 import com.projflashcards.backend.security.SecurityUtils;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,8 +19,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
-import java.util.List;
+import java.time.Duration;
+import java.util.stream.Collectors;
 
 @Service
 public class GenerateService {
@@ -29,6 +33,7 @@ public class GenerateService {
     private final DeckRepository deckRepository;
     private final FlashcardRepository flashcardRepository;
     private final SecurityUtils securityUtils;
+    private final Validator validator;
     private final String pythonServiceUrl;
     private final String internalSecret;
 
@@ -36,13 +41,18 @@ public class GenerateService {
                            @Value("${app.internal-secret}") String internalSecret,
                            DeckRepository deckRepository,
                            FlashcardRepository flashcardRepository,
-                           SecurityUtils securityUtils) {
-        this.restTemplate = new RestTemplate();
+                           SecurityUtils securityUtils,
+                           Validator validator) {
+        var requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(10));
+        requestFactory.setReadTimeout(Duration.ofMinutes(3));
+        this.restTemplate = new RestTemplate(requestFactory);
         this.pythonServiceUrl = pythonServiceUrl;
         this.internalSecret = internalSecret;
         this.deckRepository = deckRepository;
         this.flashcardRepository = flashcardRepository;
         this.securityUtils = securityUtils;
+        this.validator = validator;
     }
 
     @Transactional
@@ -75,6 +85,16 @@ public class GenerateService {
 
         if (pythonResponse == null || pythonResponse.cards() == null || pythonResponse.cards().isEmpty()) {
             throw new ExternalServiceException("O serviço de geração devolveu uma resposta vazia.");
+        }
+        var violations = validator.validate(pythonResponse);
+        if (!violations.isEmpty()) {
+            var details = violations.stream()
+                    .map(ConstraintViolation::getPropertyPath)
+                    .map(Object::toString)
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+            throw new ExternalServiceException(
+                    "O serviço de geração devolveu dados inválidos nos campos: " + details);
         }
 
         var deck = new Deck(pythonResponse.deckTitle(), pythonResponse.description(),

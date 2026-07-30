@@ -19,12 +19,15 @@ services:
     depends_on:
       python-services:
         condition: service_started
-    # DB_URL, DB_USERNAME, DB_PASSWORD e JWT_SECRET (Neon) vem daqui, injetados no container.
-    # O application.properties le essas vars direto - por isso NAO existe bloco 'environment' aqui:
-    # 'environment' interpola ${...} a partir de um .env na RAIZ (que nao existe), sobrescrevia
-    # esses valores com vazio/default e quebrava a conexao. Fonte unica: backend/.env.
+    # Credenciais do banco/JWT vêm do backend/.env. O segundo arquivo fornece
+    # INTERNAL_SECRET, usado apenas na comunicação interna com o serviço Python.
     env_file:
       - ./backend/.env
+      # Compartilha INTERNAL_SECRET com o backend sem duplicar o valor em dois arquivos.
+      # PORT é sobrescrita abaixo para não herdar a porta 8000 do serviço Python.
+      - ./python-services/.env
+    environment:
+      PORT: "8080"
     ports:
       - "${BACKEND_PORT:-8080}:8080"
 
@@ -34,5 +37,7 @@ services:
     restart: unless-stopped
     env_file:
       - ./python-services/.env
-    ports:
-      - "${PYTHON_PORT:-8000}:8000"
+    # O backend acessa este serviço pela rede interna do Compose. Não publicar a
+    # porta evita chamadas externas diretas ao endpoint que consome as APIs de IA.
+    expose:
+      - "8000"

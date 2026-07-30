@@ -7,11 +7,11 @@ correria — pode virar cards num Trello (ou equivalente) quando o grupo organiz
 
 ## Backend (Java / Spring Boot)
 
-_Sem pendências de código conhecidas_ — CRUD de decks/flashcards, geração via IA, mídia em
-`bytea`, progresso de estudo e preferências, tudo implementado e verificado. Único ponto de
-atenção: existe uma regra em `SecurityConfigurations` pra `DELETE /users/*` (ROLE_ADMIN), mas
-esse endpoint **não existe** no `UserController` — config morta, sem efeito prático, mas vale
-remover ou implementar o endpoint quando alguém for mexer ali.
+O fluxo principal está implementado. A resposta do `python-services` agora é validada novamente
+com Bean Validation antes da persistência, as chamadas externas da geração têm timeout e o
+backend não inicia com um segredo JWT padrão. Ponto não bloqueante para a apresentação: existe
+uma regra em `SecurityConfigurations` pra `DELETE /users/*` (ROLE_ADMIN), mas esse endpoint
+**não existe** no `UserController` — config morta, sem efeito prático.
 
 ## Frontend (React / TypeScript)
 
@@ -29,13 +29,13 @@ Checklist do frontend:
 
 ## python-services (Python / FastAPI)
 
-_Sem pendências de código conhecidas para uso local_ — ver `docs/DEPLOY.md` para o item do `PORT`,
-que só importa na hora do deploy.
+_Sem pendências bloqueantes conhecidas para uso local._ O endpoint de geração exige
+`INTERNAL_SECRET`, compartilhado com o backend pelo Compose.
 
 ## Infra / Docker
 
-- [ ] Reavaliar a exposição pública da porta `8000` do `python-services` antes de qualquer deploy
-  real (documentado como mudança futura na seção 7 do `ARCHITECTURE.md`, não aplicado ainda).
+- [x] Remover a exposição pública da porta `8000` do `python-services`; o backend continua
+  acessando-o pela rede interna do Compose.
 - [ ] Avaliar (no audit de segurança pré-deploy) como as credenciais são expostas via env var: hoje
   `docker inspect`/`docker compose config` mostram os valores do `backend/.env` em texto puro pra
   quem tem acesso ao daemon do Docker. Considerar Docker secrets (`/run/secrets/` + `configtree` no
@@ -93,3 +93,6 @@ que só importa na hora do deploy.
   validação opcional no Python (`modulos/internal_auth.py`), envio condicional no
   `GenerateService.java`
 - Rota `GET /health` dedicada no `python-services`, dissociada da rota genérica `/`
+- Validação Bean Validation da resposta Python antes de persistir, com timeouts nas chamadas
+- Fila de gravação do progresso de estudo para impedir atualizações fora de ordem
+- `JWT_SECRET` obrigatório, sem chave padrão conhecida

@@ -77,7 +77,8 @@ Depois de subir, os serviços ficam disponíveis em:
 * Frontend (React + Nginx): `http://localhost:5173`
 * Backend (Spring Boot): `http://localhost:8080`
 * Swagger UI: `http://localhost:8080/swagger-ui/index.html` (liberado sem token em dev)
-* Python Services (FastAPI): `http://localhost:8000`
+* Python Services (FastAPI): acessível apenas internamente pelo backend em
+  `http://python-services:8000` (não é publicado no host)
 
 Exemplos de requisição para todas as rotas implementadas estão em `docs/API_CHEATSHEET.md`.
 

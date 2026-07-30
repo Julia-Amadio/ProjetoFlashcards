@@ -450,10 +450,9 @@ regra explícita no `SecurityConfigurations` — caem no `.anyRequest().authenti
 cadeia, ou seja, já são acessíveis a qualquer usuário autenticado (`ROLE_USER` incluso), o que é
 o comportamento correto: qualquer estudante precisa acessar imagem e áudio durante o estudo.
 
-> **NOTA — sobre a exposição do `python-services`:** hoje, em ambiente de teste, a porta 8000 do
-> `python-services` é publicada para o host (`ports: "8000:8000"`) só para facilitar validação
-> manual. Container-to-container dentro da rede do Compose **não precisa** dessa porta publicada
-> para se comunicar — `backend` já enxerga `python-services:8000` pelo nome do serviço. Desde a
+> **NOTA — sobre a exposição do `python-services`:** a porta 8000 não é publicada para o host.
+> Container-to-container dentro da rede do Compose **não precisa** dessa porta publicada
+> para se comunicar — `backend` enxerga `python-services:8000` pelo nome do serviço. Desde a
 > implementação do `INTERNAL_SECRET` (header `X-Internal-Token`), o endpoint `/generate` tem
 > autenticação própria, mas a porta ainda deve ser fechada em produção para eliminar a superfície
 > de ataque. O endpoint `/health` não tem auth por ser usado exclusivamente pelo Docker HEALTHCHECK
@@ -464,24 +463,18 @@ o comportamento correto: qualquer estudante precisa acessar imagem e áudio dura
 Os itens abaixo foram identificados como melhorias e já implementados:
 
 1. **Segredo compartilhado entre Java e Python** (header `X-Internal-Token`, validado a partir
-   do `INTERNAL_SECRET` em ambos os `.env` files). O endpoint `/generate` do python-services exige
-   esse token; o Java envia em toda chamada.
+   do `INTERNAL_SECRET` de `python-services/.env`, compartilhado com o backend pelo Compose).
+   O endpoint `/generate` exige esse token; o Java envia em toda chamada.
 2. **`.env`/`.env.example` próprio do python-services**, lido via `env_file` no Compose.
 3. **Rota `/health` dedicada** para o Docker HEALTHCHECK, sem auth, retornando `{"status": "ok"}`.
    O HEALTHCHECK do Dockerfile foi atualizado para apontar para ela.
 
-### Possíveis mudanças futuras (ainda não aplicadas)
+### Possíveis mudanças futuras
 
 Os pontos abaixo são melhorias identificadas, mas propositalmente **não implementadas ainda** —
 ficam registradas aqui como próximos passos quando o projeto se aproximar de um deploy real:
 
-1. **Remover o `ports: "8000:8000"` do `docker-compose.yml` de produção.** Esse mapeamento só
-   serve para expor a porta do container para fora do Docker (o host, e por extensão a internet
-   caso o host tenha IP público). Como a comunicação `backend` → `python-services` já acontece
-   pela rede interna do Compose (via nome do serviço, sem precisar de porta publicada), remover
-   esse mapeamento em prod fecha o acesso direto de qualquer pessoa de fora, sem quebrar nada
-   entre os dois módulos.
-2. **Decidir como manter a conveniência de testar `localhost:8000` manualmente (Postman) sem
+1. **Decidir como manter a conveniência de testar `localhost:8000` manualmente (Postman) sem
    reabrir a porta em produção.** Como hoje só existe um `docker-compose.yml` (ver seção 1),
    isso não pode mais ser resolvido só com um segundo arquivo de override — a decisão de qual
    mecanismo usar (um compose específico de deploy, `profiles` do Compose, ou simplesmente uma
