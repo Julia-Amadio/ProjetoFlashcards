@@ -53,8 +53,11 @@ EXPOSE 8000
 # Caso ocorram três falhas consecutivas, o container é marcado como 'unhealthy',
 # e o orquestrador pode reiniciá-lo ou tirar ele do load balancer.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+  CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '8000') + '/health')" || exit 1
 
 # --host 0.0.0.0 é obrigatório: sem isso o Uvicorn só escuta em localhost
 # *dentro* do container, e o Docker não consegue rotear a porta pra fora.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# CMD em shell form (não é um array) justamente pra "${PORT:-8000}" ser expandido de
+# verdade: plataformas de deploy (Render, Railway, Fly.io) atribuem a porta dinamicamente
+# via env var PORT; localmente, sem PORT definida, cai no mesmo 8000 de sempre.
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
