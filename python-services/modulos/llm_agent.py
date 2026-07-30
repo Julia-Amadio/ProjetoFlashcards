@@ -137,42 +137,57 @@ def _build_system_prompt(target_language: str, native_language: str) -> str:
     3. Para particulas e conectivos, use simbolos ou cenas de contexto.
     """
 
-def gerar_flashcards_json(input_usuario: str, language: str = "mandarin") -> List[dict]:
-    """Processa o input e retorna uma lista de dicionários com os dados gerados pela IA."""
-    palavras = [p.strip() for p in input_usuario.split(',') if p.strip()]
-    qtd_palavras = len(palavras)
-    
-    if qtd_palavras == 0:
-        raise ValueError("Nenhuma palavra identificada no input.")
-    if qtd_palavras > max_palavras:
-        raise ValueError(f"Limite excedido. Você enviou {qtd_palavras} palavras. O máximo é {max_palavras}.")
+def gerar_flashcards_json(input_usuario: str, language: str = "mandarin", mode: str = "words", difficulty_level: str = "") -> List[dict]:
+    """Processa o input e retorna uma lista de dicionários com os dados gerados pela IA.
 
-    # Limite de caracteres por palavra (ex: 20 caracteres)
-    LIMITE_CARACTERES = 30
-    for palavra in palavras:
-        if len(palavra) > LIMITE_CARACTERES:
-            raise ValueError(f"A palavra '{palavra}' excede o limite de {LIMITE_CARACTERES} caracteres. Por favor, insira apenas uma palavra ou termo curto por campo.")
-    
-    input_limpo = ", ".join(palavras)
-    print(f"[LLM] Processando {qtd_palavras} palavra(s) via OpenAI...")
-
+    Args:
+        input_usuario: comma-separated words (mode='words') or topic string (mode='topic')
+        language: target language code
+        mode: 'words' for word-list mode, 'topic' for topic-based generation
+        difficulty_level: optional difficulty level hint (used in topic mode)
+    """
     config = get_language_config(language)
     system_prompt = _build_system_prompt(
         target_language=config["target_language"],
         native_language=config["native_language"],
     )
 
+    if mode == "words":
+        palavras = [p.strip() for p in input_usuario.split(',') if p.strip()]
+        qtd_palavras = len(palavras)
+
+        if qtd_palavras == 0:
+            raise ValueError("Nenhuma palavra identificada no input.")
+        if qtd_palavras > max_palavras:
+            raise ValueError(f"Limite excedido. Você enviou {qtd_palavras} palavras. O máximo é {max_palavras}.")
+
+        LIMITE_CARACTERES = 30
+        for palavra in palavras:
+            if len(palavra) > LIMITE_CARACTERES:
+                raise ValueError(f"A palavra '{palavra}' excede o limite de {LIMITE_CARACTERES} caracteres. Por favor, insira apenas uma palavra ou termo curto por campo.")
+
+        input_limpo = ", ".join(palavras)
+        print(f"[LLM] Processando {qtd_palavras} palavra(s) via OpenAI...")
+        user_prompt = f"Gere flashcards para o seguinte vocabulário: {input_limpo}"
+
+    elif mode == "topic":
+        print(f"[LLM] Gerando flashcards sobre o tópico: {input_usuario}")
+        diff_hint = f" (nível de dificuldade: {difficulty_level})" if difficulty_level else ""
+        user_prompt = f"Gere flashcards de vocabulário sobre o tópico: {input_usuario}{diff_hint}"
+
+    else:
+        raise ValueError(f"Modo inválido: '{mode}'. Use 'words' ou 'topic'.")
+
     response = client.beta.chat.completions.parse(
         model="gpt-5",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Gere flashcards para o seguinte vocabulário: {input_limpo}"}
+            {"role": "user", "content": user_prompt}
         ],
         response_format=_get_response_format(language),
         temperature=1
     )
 
     resultado_json = response.choices[0].message.parsed
-    
-    # Retorna como uma lista de dicionários (dict) para facilitar a adição da imagem depois
+
     return [card.model_dump() for card in resultado_json.flashcards]

@@ -15,6 +15,9 @@ public record PythonDeckResponse(
             @JsonProperty("part_of_speech") String partOfSpeech,
             @JsonProperty("target_sentence") String targetSentence,
             @JsonProperty("sentence_phonetic") String sentencePhonetic,
-            @JsonProperty("sentence_translation") String sentenceTranslation
+            @JsonProperty("sentence_translation") String sentenceTranslation,
+            @JsonProperty("image_url") String imageUrl,
+            @JsonProperty("audio_word_url") String audioWordUrl,
+            @JsonProperty("audio_sentence_url") String audioSentenceUrl
     ) {}
 }

@@ -17,17 +17,14 @@ _Nenhuma task pendente no backend._
 
 ## python-services (Python / FastAPI)
 
-- [ ] Refatoração geral do módulo — hoje é só o stub de `main.py`; `buscador_imagens.py`,
-  `gerador_audio.py` e `llm_agent.py` são herdados e ainda não estão conectados a nada.
-- [ ] Endpoint real de geração de flashcards, devolvendo o payload JSON estruturado combinado com
-  o Java (contrato descrito em `ARCHITECTURE.md`, seção 6).
-- [ ] Validação da resposta do LLM com Pydantic (camada 1 da validação em duas camadas).
-- [ ] `.env`/`.env.example` próprio do serviço (hoje não existe nenhum — o `env_file` no compose
-  foi marcado como opcional só pra não travar o build enquanto isso).
-- [ ] Decidir se vale implementar o segredo compartilhado entre Java e Python (defesa em
-  profundidade, ver "mudanças futuras" na seção 6 do `ARCHITECTURE.md`).
-- [ ] Avaliar se vale a pena uma rota `/health` dedicada, já que hoje o healthcheck do Dockerfile
-  só bate na rota `/` genérica do stub.
+
+## Backend (Java / Spring Boot) — como consequência do item acima
+
+- [ ] Adicionar colunas `bytea` à entidade `Flashcard` (via Flyway) para armazenar imagem e áudio
+- [ ] Criar endpoints `GET /flashcards/{id}/image`, .../audio/word, .../audio/sentence
+- [ ] Atualizar `GenerateService` para baixar a mídia das URLs do Python e salvar como bytes
+- [ ] Atualizar `PythonDeckResponse` e `GenerateResponse` para o novo formato unificado
+- [ ] Adicionar `image_mime_type` à entidade `Flashcard`
 
 ## Infra / Docker
 
@@ -58,3 +55,16 @@ _Nenhuma task pendente no backend._
   frontend guardando o UUID do usuário além do token
 - Progresso de estudo e preferências persistidos no backend (`/users/{userId}/study-progress/{deckId}`
   e `/users/{userId}/preferences`), substituindo o armazenamento local (`localStorage`)
+- Endpoint real de geração de flashcards no `python-services` (`POST /generate`) com payload JSON
+  estruturado alinhado ao contrato Java
+- Validação da resposta do LLM com Pydantic no `python-services` (camada 1 da validação em duas camadas)
+- ADR-0001: Mídia de flashcards armazenada como `bytea` no PostgreSQL (docs/adr/0001-media-storage.md)
+- Adaptar `llm_agent.py` + `gerador_apkg.py` + `buscador_imagens.py` + `gerador_audio.py`
+  para trabalharem via FastAPI com uma resposta unificada. Direção decidida:
+  - Resposta unificada (genérica, não específica por idioma)
+  - Python baixa imagem (Pexels) e gera áudio (Edge-TTS) inline
+  - Retorna URLs temporárias de mídia no JSON
+  - Java faz download dos bytes e armazena em bytea no PostgreSQL (ver ADR-0001)
+- `.env`/`.env.example` próprio do serviço (`env_file` no compose e funcionando).  
+- Segredo compartilhado entre Java e Python implementado.
+- Rota `/health` dedicada adicionada.

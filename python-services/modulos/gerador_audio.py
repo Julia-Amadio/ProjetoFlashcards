@@ -8,7 +8,7 @@ async def _gerar_audio_async(texto: str, caminho_saida: str, voz: str):
     communicate = edge_tts.Communicate(texto, voz)
     await communicate.save(caminho_saida)
 
-def gerar_audio_local(texto: str, nome_arquivo_base: str, voz: str):
+def gerar_audio_local(texto: str, nome_arquivo_base: str, voz: str, diretorio: str = "media_temp"):
     """
     Função síncrona que o main.py vai chamar. 
     Ela usa o asyncio para rodar a função assíncrona acima.
@@ -17,7 +17,8 @@ def gerar_audio_local(texto: str, nome_arquivo_base: str, voz: str):
     
     try:
         nome_arquivo = f"{nome_arquivo_base}.mp3"
-        caminho = os.path.join("media_temp", nome_arquivo)
+        caminho = os.path.join(diretorio, nome_arquivo)
+        os.makedirs(diretorio, exist_ok=True)
         
         # Roda o processo assíncrono e espera ele terminar
         asyncio.run(_gerar_audio_async(texto, caminho, voz))
