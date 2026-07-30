@@ -17,8 +17,6 @@ _Nenhuma task pendente no backend._
 
 ## python-services (Python / FastAPI)
 
-- [x] Avaliar se vale a pena uma rota `/health` dedicada, já que hoje o healthcheck do Dockerfile
-  só bate na rota `/` genérica.
 
 ## Backend (Java / Spring Boot) — como consequência do item acima
 
@@ -67,5 +65,6 @@ _Nenhuma task pendente no backend._
   - Python baixa imagem (Pexels) e gera áudio (Edge-TTS) inline
   - Retorna URLs temporárias de mídia no JSON
   - Java faz download dos bytes e armazena em bytea no PostgreSQL (ver ADR-0001)
-- [ ] `.env`/`.env.example` próprio do serviço (`env_file` no compose e funcionando).  
-- [ ] Segredo compartilhado entre Java e Python implementado.
+- `.env`/`.env.example` próprio do serviço (`env_file` no compose e funcionando).  
+- Segredo compartilhado entre Java e Python implementado.
+- Rota `/health` dedicada adicionada.

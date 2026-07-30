@@ -116,6 +116,9 @@ retornando um erro amigável antes mesmo de tentar salvar no banco.
 
 ## 3. Stack - Python Services
 - **FastAPI:** framework web que expõe os scripts de IA como endpoints que o Java pode chamar.
+  - `GET /health` — liveness check, sem auth, retorna `{"status": "ok"}`
+  - `GET /` — rota genérica, retorna `{"status": "AI Service running"}`
+  - `POST /generate` — geração de flashcards, protegida por `INTERNAL_SECRET`
 - **OpenAI SDK:** para integração com o GPT-4o-mini (fallback) e o modelo `gpt-5` via 
   `client.beta.chat.completions.parse` com resposta estruturada por idioma.
 - **Edge-TTS:** para gerar áudios com vozes neurais realistas sem custo.
@@ -401,12 +404,25 @@ acessar imagens e áudios durante o estudo.
 > **NOTA — sobre a exposição do `python-services`:** hoje, em ambiente de teste, a porta 8000 do
 > `python-services` é publicada para o host (`ports: "8000:8000"`) só para facilitar validação
 > manual. Container-to-container dentro da rede do Compose **não precisa** dessa porta publicada
-> para se comunicar — `backend` já enxerga `python-services:8000` pelo nome do serviço. Antes de
-> qualquer deploy real, vale reavaliar se essa porta deve continuar exposta publicamente, já que
-> o `python-services` hoje não tem autenticação própria e depende inteiramente do Java já ter
-> barrado o acesso antes de chamá-lo.
+> para se comunicar — `backend` já enxerga `python-services:8000` pelo nome do serviço. Desde a
+> implementação do `INTERNAL_SECRET` (header `X-Internal-Token`), o endpoint `/generate` tem
+> autenticação própria, mas a porta ainda deve ser fechada em produção para eliminar a superfície
+> de ataque. O endpoint `/health` não tem auth por ser usado exclusivamente pelo Docker HEALTHCHECK
+> na rede interna do container.
+
+### ✅ Já aplicadas
+
+Os itens abaixo foram identificados como melhorias e já implementados:
+
+1. **Segredo compartilhado entre Java e Python** (header `X-Internal-Token`, validado a partir
+   do `INTERNAL_SECRET` em ambos os `.env` files). O endpoint `/generate` do python-services exige
+   esse token; o Java envia em toda chamada.
+2. **`.env`/`.env.example` próprio do python-services**, lido via `env_file` no Compose.
+3. **Rota `/health` dedicada** para o Docker HEALTHCHECK, sem auth, retornando `{"status": "ok"}`.
+   O HEALTHCHECK do Dockerfile foi atualizado para apontar para ela.
 
 ### Possíveis mudanças futuras (ainda não aplicadas)
+
 Os pontos abaixo são melhorias identificadas, mas propositalmente **não implementadas ainda** —
 ficam registradas aqui como próximos passos quando o projeto se aproximar de um deploy real:
 
@@ -422,9 +438,5 @@ ficam registradas aqui como próximos passos quando o projeto se aproximar de um
    mecanismo usar (um compose específico de deploy, `profiles` do Compose, ou simplesmente uma
    regra de firewall/security group na infraestrutura de hospedagem) fica em aberto até o projeto
    se aproximar de um deploy real.
-3. **Adicionar um segredo compartilhado entre Java e Python** (ex: header `X-Internal-Token`,
-   validado a partir de uma env var que só os dois módulos conhecem) como camada extra de defesa.
-   Mesmo sem a porta exposta, isso protege contra: reexposição acidental da porta no futuro, ou o
-   projeto crescer e outro serviço não relacionado acabar entrando na mesma rede Docker.
 
 ---
